@@ -18,10 +18,6 @@ class GPMPCModel:
             solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
             self.N = N
             self.dt = dt
-            self.lr = 0.45
-            self.lf = 0.45
-            self.mass = 25.0
-
             self.load_model()
             if(model_build):
                 self.model_build()            
@@ -124,9 +120,9 @@ class GPMPCModel:
         input u = [F,phi]
         """
         # set physical constants
-        l_r = self.lr # distance rear wheels to center of gravitiy of the car
-        l_f = self.lf # distance front wheels to center of gravitiy of the car
-        m = self.mass   # mass of the car
+        l_r = 0.45 # distance rear wheels to center of gravitiy of the car
+        l_f = 0.45 # distance front wheels to center of gravitiy of the car
+        m = 25.0   # mass of the car
 
         # set parameters
         # beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(x[4]))

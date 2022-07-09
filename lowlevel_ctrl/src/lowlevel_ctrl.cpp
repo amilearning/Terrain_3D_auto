@@ -221,14 +221,16 @@ void LowlevelCtrl::ControlLoop()
         // throttle - brake {0,0} = (0.0 +rolling_term + pitch_term)/cmd_scale - cmd_off/cmd_scale;        
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // if(diff_time < 0.5){         
-            throttle_cmd = (manual_acc_cmd + rolling_term+pitch_term)/cmd_scale - cmd_offset/cmd_scale;                     
-            // if(local_speed < 0.1 && vehicle_cmd.acceleration <=0){
-              if(local_speed < 0.1 && manual_acc_cmd <=0){
+            throttle_cmd = (vehicle_cmd.acceleration + rolling_term+pitch_term)/cmd_scale - cmd_offset/cmd_scale;                     
+            // throttle_cmd = throttle_cmd+0.1;
+            if(local_speed < 0.1 && vehicle_cmd.acceleration <=0){
+              // if(local_speed < 0.1 && manual_acc_cmd <=0){
               throttle_cmd = 0.0;              
             }          
           if ( throttle_cmd < 0.0){
             brake_cmd = -throttle_cmd;
           }
+          ;
           throttle_cmd = std::max(std::min(throttle_cmd,1.0),0.0);          
           brake_cmd = std::max(std::min(brake_cmd,1.0),0.0);          
         // }
@@ -246,20 +248,13 @@ void LowlevelCtrl::ControlLoop()
         debug_msg.pose.orientation.z =  throttle_cmd;        
         debug_msg.pose.orientation.w =  brake_cmd;
         debugPub.publish(debug_msg); 
-        if(enforce_throttle){
+        
           // throttle_cmd = manual_throttle;
         chassis_cmd.throttle = throttle_cmd;        
         chassis_cmd.frontBrake =brake_cmd;
         chassis_cmd.steering =vehicle_cmd.steering/(25*PI/180.0);               
         chassisCmdPub.publish(chassis_cmd);
-        }else{
-          throttle_cmd = 0.0;
-          brake_cmd = 1.0;     
-        chassis_cmd.throttle = throttle_cmd;        
-        chassis_cmd.frontBrake =brake_cmd;
-        chassis_cmd.steering =vehicle_cmd.steering/(25*PI/180.0);               
-        chassisCmdPub.publish(chassis_cmd);
-        }
+        
         
       }
 
@@ -277,13 +272,13 @@ void LowlevelCtrl::ControlLoop()
 
 void LowlevelCtrl::dyn_callback(lowlevel_ctrl::testConfig &config, uint32_t level)
 {  
-        enforce_throttle = config.enforce_throttle;
-        // cmd_scale = config.scale;
-        // cmd_offset = config.offset;
-        manual_acc_cmd = config.manual_acc_cmd;
-        manual_throttle=config.manual_throttle; 
-        double scale = 6.1;        
-        double offset = -0.8;
+        // enforce_throttle = config.enforce_throttle;
+        // // cmd_scale = config.scale;
+        // // cmd_offset = config.offset;
+        // manual_acc_cmd = config.manual_acc_cmd;
+        // manual_throttle=config.manual_throttle; 
+        // double scale = 6.1;        
+        // double offset = -0.8;
         
     
 }

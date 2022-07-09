@@ -57,9 +57,11 @@ limitations under the License.
   <xacro:property name="hub_dia" value="0.024"/>
   <xacro:property name="tire_dia" value="0.19"/>
   <!-- <xacro:property name="hex_hub_depth" value="0.0"/>  -->
-  <xacro:property name="front_tire_width" value="0.072644"/>
+  <!-- <xacro:property name="front_tire_width" value="0.072644"/> -->
+  <xacro:property name="front_tire_width" value="0.212644"/>
   <xacro:property name="front_wheel_mass" value="0.82"/>
-  <xacro:property name="rear_tire_width" value="0.0762"/>
+  <!-- <xacro:property name="rear_tire_width" value="0.0762"/> -->
+  <xacro:property name="rear_tire_width" value="0.212644"/>
   <xacro:property name="rear_wheel_mass" value="0.89"/>
 
   <!-- hex_hub_dist is the distance between left and right hex hubs when

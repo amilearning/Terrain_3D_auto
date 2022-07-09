@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import rospy
 
-
-""" ROS node for the MPC GP in 3d offroad environment, to use in the Gazebo simulator and real world experiments.
+""" ROS node for generating simple trajectory.
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
@@ -28,35 +27,24 @@ from hmcl_msgs.msg import Lane, Waypoint, vehicleCmd
 from visualization_msgs.msg import MarkerArray, Marker
 from autorally_msgs.msg import chassisState
 
-from mpc_gp.traj_gen import TrajManager
 from mpc_gp.mpc_model import GPMPCModel
 from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel
-from mpc_gp.dataloader import DataLoader
-
-import rospkg
-rospack = rospkg.RosPack()
-pkg_dir = rospack.get_path('mpc_gp')
-
-
 
 def clamp(n, minn, maxn):
     return max(min(maxn, n), minn)
 
-class GPMPCWrapper:
+class GenTraj:
     def __init__(self,environment="gazebo"):
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
         self.model_build_flag = rospy.get_param('~build_flat', default=True)             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
-         # x, y, vx, psi
-        self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0]))
+        
 #################################################################        
         # Initialize GP MPC         
 #################################################################
         self.MPCModel = GPMPCModel( model_build = self.model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
-        self.TrajSampler = TrajManager(self.MPCModel)
-        self.dataloader = DataLoader(input_dim = 2, state_dim = len(self.cur_x) )
         self.odom_available           = False 
         self.vehicle_status_available = False 
         self.waypoint_available = False 
@@ -75,8 +63,7 @@ class GPMPCWrapper:
         waypoint_topic = "/move_base_simple/goal"                
         obs_topic = "/initialpose"       
         status_topic = "/is_mpc_busy"
-        self.file_name = "test_data.npz"
-        self.logging = False
+        
         # Publishers
         self.control_pub = rospy.Publisher(control_topic, vehicleCmd, queue_size=1, tcp_nodelay=True)        
         self.mpc_predicted_trj_publisher = rospy.Publisher("/mpc_pred_trajectory", MarkerArray, queue_size=2)
@@ -88,14 +75,9 @@ class GPMPCWrapper:
         self.vehicle_status_sub = rospy.Subscriber(vehicle_status_topic, chassisState, self.vehicle_status_callback)                
         self.waypoint_sub = rospy.Subscriber(waypoint_topic, PoseStamped, self.waypoint_callback)
         self.obs_sub = rospy.Subscriber(obs_topic, PoseWithCovarianceStamped, self.obs_callback)
-        self.data_saver_sub = rospy.Subscriber("/mpc_data_save", Bool, self.data_saver_callback)
-        self.data_logging_sub = rospy.Subscriber("/mpc_data_logging", Bool, self.data_logging_callback)
-
-        # Timers
-        self.TrajGen_timer = rospy.Timer(rospy.Duration(0.1), self.trajGen_callback) 
 
         # 20Hz control callback 
-        self.cmd_timer = rospy.Timer(rospy.Duration(0.05), self.cmd_callback) 
+        self.cmd_timer = rospy.Timer(rospy.Duration(0.1), self.cmd_callback) 
         self.blend_min = 3
         self.blend_max = 5
         self.is_first_mpc = True
@@ -107,17 +89,6 @@ class GPMPCWrapper:
             msg.data = True
             self.status_pub.publish(msg)
             rate.sleep()
-
-    def data_logging_callback(self,msg):
-        if msg.data:
-            self.logging = True
-        else:
-            self.logging = False
-
-    def data_saver_callback(self,msg):
-        if msg.data:
-            save_path = pkg_dir + '/data/'+self.file_name            
-            self.dataloader.file_save(save_path)
 
     def obs_callback(self,msg):
         self.obs_pose = msg
@@ -132,18 +103,29 @@ class GPMPCWrapper:
             self.waypoint_available = True
         self.waypoint = msg
 
-    def run_mpc(self):
+    def run_mpc(self, odom):
         if self.MPCModel is None:
-            return        
-        xinit = self.cur_x
+            return
+        current_euler = get_odom_euler(self.odom)
+        local_vel = get_local_vel(self.odom, is_odom_local_frame = True)
+        self.debug_msg.header.stamp = rospy.Time.now()
+        self.debug_msg.pose.position.x = local_vel[0]
+        self.debug_msg.pose.position.y = local_vel[1]
+        self.debug_msg.pose.position.z = local_vel[2]
+        self.debug_pub.publish(self.debug_msg)
+        
+        # xinit = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2], self.chassisState.steering]))
+        xinit = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2]]))
         if self.is_first_mpc:
-            self.is_first_mpc = False            
-            x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3]])
+            self.is_first_mpc = False
+            # x0i = np.array([0.,0.,self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, 1.0, current_euler[2], self.chassisState.steering])
+            x0i = np.array([0.,0.,self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, 1.0, current_euler[2]])
             x0 = np.transpose(np.tile(x0i, (1, self.MPCModel.model.N)))
             problem = {"x0": x0,
                     "xinit": xinit}
         else:
-            problem = {"xinit": xinit}                
+            problem = {"xinit": xinit} 
+               
         obstacle_ = np.array([self.obs_pose.pose.pose.position.x, self.obs_pose.pose.pose.position.y])
         goal_ = np.array([self.waypoint.pose.position.x, self.waypoint.pose.position.y])        
         problem["all_parameters"] = np.transpose(np.tile(np.concatenate((goal_,obstacle_)),(1,self.MPCModel.model.N)))        
@@ -169,21 +151,6 @@ class GPMPCWrapper:
         ctrl_cmd.steering =  -1*u_pred[1,0]  #-1*u_pred[1,0]*0.05+self.chassisState.steering
         self.control_pub.publish(ctrl_cmd)
 
-        if self.logging:
-            add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3]])                    
-            self.dataloader.append_state(add_state,temp[:,1])     
-
-
-    def trajGen_callback(self,timer):
-        if self.TrajSampler is None:
-            return 
-        # self.TrajSampler.setState(xstate)
-        # self.TrajSampler.randome_traj(curvature)
-        # self.TrajSampler.disp_traj()
-
-
-        
-
     def cmd_callback(self,timer):
         if self.vehicle_status_available is False:
             rospy.loginfo("Vehicle status is not available yet")
@@ -194,17 +161,7 @@ class GPMPCWrapper:
         elif self.waypoint_available is False:
             rospy.loginfo("Waypoints are not available yet")
             return
-        
-        current_euler = get_odom_euler(self.odom)
-        local_vel = get_local_vel(self.odom, is_odom_local_frame = True)
-        self.debug_msg.header.stamp = rospy.Time.now()
-        self.debug_msg.pose.position.x = local_vel[0]
-        self.debug_msg.pose.position.y = local_vel[1]
-        self.debug_msg.pose.position.z = local_vel[2]
-        self.debug_pub.publish(self.debug_msg)        
-        self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2]]))
-        
-           
+  
 
         def _thread_func():
             self.run_mpc(self.odom)            
@@ -335,9 +292,9 @@ class GPMPCWrapper:
 ###################################################################################
 
 def main():
-    rospy.init_node("mpc_gp")
+    rospy.init_node("traj_gen")
     env = rospy.get_param('~environment', default='gazebo')
-    GPMPCWrapper(env)
+    GenTraj(env)
 
 if __name__ == "__main__":
     main()
