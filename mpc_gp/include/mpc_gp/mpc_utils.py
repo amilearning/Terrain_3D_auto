@@ -10,7 +10,7 @@ import joblib
 import random
 import pyquaternion
 import numpy as np
-
+from visualization_msgs.msg import MarkerArray, Marker
 
 def wrap_to_pi(angle):
     """
@@ -86,3 +86,30 @@ def get_local_vel(odom, is_odom_local_frame = True):
         local_vel[1] = odom.twist.twist.linear.y
         local_vel[2] = odom.twist.twist.linear.z
     return local_vel 
+
+
+def traj_to_markerArray(traj):
+
+    marker_refs = MarkerArray() 
+    for i in range(len(traj[:,0])):
+        marker_ref = Marker()
+        marker_ref.header.frame_id = "map"  
+        marker_ref.ns = "ref_states"+str(i)
+        marker_ref.id = i
+        marker_ref.type = Marker.ARROW
+        marker_ref.action = Marker.ADD                
+        marker_ref.pose.position.x = traj[i,0] 
+        marker_ref.pose.position.y = traj[i,1]              
+        quat_tmp = euler_to_quaternion(0.0, 0.0, traj[i,3])     
+        quat_tmp = unit_quat(quat_tmp)                 
+        marker_ref.pose.orientation.w = quat_tmp[0]
+        marker_ref.pose.orientation.x = quat_tmp[1]
+        marker_ref.pose.orientation.y = quat_tmp[2]
+        marker_ref.pose.orientation.z = quat_tmp[3]
+        marker_ref.color.r, marker_ref.color.g, marker_ref.color.b = (0, 255, 0)
+        marker_ref.color.a = 0.5
+        marker_ref.scale.x, marker_ref.scale.y, marker_ref.scale.z = (0.2, 0.2, 0.15)
+        marker_refs.markers.append(marker_ref)
+        
+
+    return marker_refs

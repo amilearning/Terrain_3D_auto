@@ -1,3 +1,4 @@
 .vscode/
 *.pyc
 *vc.db
+mpc_gp/data/*

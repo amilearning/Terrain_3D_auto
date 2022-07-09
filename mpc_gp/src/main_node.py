@@ -30,7 +30,7 @@ from autorally_msgs.msg import chassisState
 
 from mpc_gp.traj_gen import TrajManager
 from mpc_gp.mpc_model import GPMPCModel
-from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel
+from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray
 from mpc_gp.dataloader import DataLoader
 
 import rospkg
@@ -47,7 +47,7 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.model_build_flag = rospy.get_param('~build_flat', default=True)             
+        self.model_build_flag = rospy.get_param('~build_flat', default=False)             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
          # x, y, vx, psi
         self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0]))
@@ -55,7 +55,7 @@ class GPMPCWrapper:
         # Initialize GP MPC         
 #################################################################
         self.MPCModel = GPMPCModel( model_build = self.model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
-        self.TrajSampler = TrajManager(self.MPCModel)
+        self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)            
         self.dataloader = DataLoader(input_dim = 2, state_dim = len(self.cur_x) )
         self.odom_available           = False 
         self.vehicle_status_available = False 
@@ -80,6 +80,7 @@ class GPMPCWrapper:
         # Publishers
         self.control_pub = rospy.Publisher(control_topic, vehicleCmd, queue_size=1, tcp_nodelay=True)        
         self.mpc_predicted_trj_publisher = rospy.Publisher("/mpc_pred_trajectory", MarkerArray, queue_size=2)
+        self.mpc_ref_traj_publisher = rospy.Publisher("/mpc_ref_traj", MarkerArray, queue_size=2)
         self.final_ref_publisher = rospy.Publisher("/final_trajectory", MarkerArray, queue_size=2)    
         self.status_pub = rospy.Publisher(status_topic, Bool, queue_size=2)    
         self.debug_pub = rospy.Publisher("mpc_debug", PoseStamped, queue_size=2)    
@@ -93,7 +94,7 @@ class GPMPCWrapper:
 
         # Timers
         self.TrajGen_timer = rospy.Timer(rospy.Duration(0.1), self.trajGen_callback) 
-
+        self.local_traj = None
         # 20Hz control callback 
         self.cmd_timer = rospy.Timer(rospy.Duration(0.05), self.cmd_callback) 
         self.blend_min = 3
@@ -118,6 +119,9 @@ class GPMPCWrapper:
         if msg.data:
             save_path = pkg_dir + '/data/'+self.file_name            
             self.dataloader.file_save(save_path)
+            messageToPring =  "file has been saved in " + str(save_path)
+            rospy.loginfo(messageToPring)
+
 
     def obs_callback(self,msg):
         self.obs_pose = msg
@@ -153,8 +157,6 @@ class GPMPCWrapper:
             .format(info.it, info.solvetime))            
             return
             
-        
-        
         temp = np.zeros((np.max(self.MPCModel.model.nvar), self.MPCModel.model.N))
         for i in range(0, self.MPCModel.model.N):
             temp[:, i] = output['x{0:02d}'.format(i+1)]
@@ -169,31 +171,26 @@ class GPMPCWrapper:
         ctrl_cmd.steering =  -1*u_pred[1,0]  #-1*u_pred[1,0]*0.05+self.chassisState.steering
         self.control_pub.publish(ctrl_cmd)
 
+        ########  Log State Data ###################################################
         if self.logging:
             add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3]])                    
             self.dataloader.append_state(add_state,temp[:,1])     
+            rospy.loginfo("recording process %d",self.dataloader.n_data_set)
+        ########  Log State Data END ###################################################
 
 
     def trajGen_callback(self,timer):
-        if self.TrajSampler is None:
+        if self.TrajManager is None:
             return 
-        # self.TrajSampler.setState(xstate)
-        # self.TrajSampler.randome_traj(curvature)
-        # self.TrajSampler.disp_traj()
-
-
-        
+        self.TrajManager.setState(self.cur_x)
+        delta = 0.1
+        velocity = 2.0        
+        self.ref_state = self.TrajManager.gen_traj(delta, velocity)        
+        marker_refs = traj_to_markerArray(self.ref_state)
+        self.mpc_ref_traj_publisher.publish(marker_refs)
 
     def cmd_callback(self,timer):
-        if self.vehicle_status_available is False:
-            rospy.loginfo("Vehicle status is not available yet")
-            return
-        elif self.odom_available is False:
-            rospy.loginfo("Odom is not available yet")
-            return
-        elif self.waypoint_available is False:
-            rospy.loginfo("Waypoints are not available yet")
-            return
+        
         
         current_euler = get_odom_euler(self.odom)
         local_vel = get_local_vel(self.odom, is_odom_local_frame = True)
@@ -204,94 +201,23 @@ class GPMPCWrapper:
         self.debug_pub.publish(self.debug_msg)        
         self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2]]))
         
-           
+
+        if self.vehicle_status_available is False:
+            rospy.loginfo("Vehicle status is not available yet")
+            return
+        elif self.odom_available is False:
+            rospy.loginfo("Odom is not available yet")
+            return
+        elif self.waypoint_available is False:
+            rospy.loginfo("Waypoints are not available yet")
+            return
 
         def _thread_func():
-            self.run_mpc(self.odom)            
+            self.run_mpc()            
         self.mpc_thread = threading.Thread(target=_thread_func(), args=(), daemon=True)
         self.mpc_thread.start()
         self.mpc_thread.join()
-        
-
-    
-
-    #     """
-    #     :param odom: message from subscriber.
-    #     :type odom: Odometry
-    #     :param recording: If False, some messages were skipped between this and last optimization. Don't record any data
-    #     during this optimization if in recording mode.
-    #     """
-    #     if not self.pose_available or not self.vehicle_status_available:
-    #         return
-    #     if not self.waypoint_available:
-    #         return
-    #     # Measure time between initial state was checked in and now
-    #     dt = odom.header.stamp.to_time() - self.last_update_time
-
-    #     # model_data, x_guess, u_guess = self.set_reference()         --> previous call
-    #     if len(x_ref) < self.n_mpc_nodes:
-    #         ref = [x_ref[-1], y_ref[-1], psi_ref[-1], 0.0, 0.0, 0.0, 0.0]
-    #         u_ref = [0.0, 0.0]   
-    #         terminal_point = True               
-    #     else:        
-    #         ref = np.zeros([7,len(x_ref)])
-    #         ref[0] = x_ref
-    #         ref[1] = y_ref
-    #         ref[2] = psi_ref
-    #         ref[3] = vel_ref
-    #         ref = ref.transpose()
-    #         u_ref = np.zeros((len(vel_ref)-1,2))
-    #         terminal_point = False
-        
-    #     model_data = self.gp_mpc.set_reference(ref,u_ref,terminal_point)        
-    
-    #     if self.mpc_ready is False: 
-    #         return
-    #     # Run MPC and publish control
-    #     try:
-    #         tic = time.time()            
-    #         next_control, w_opt, x_opt, self.solver_status = self.gp_mpc.optimize(model_data)
-    #         ####################################
-    #         if x_opt is not None:                
-    #             self.predicted_trj_visualize(x_opt)
-    #         ####################################
-    #         ## Check whether the predicted trajectory is close to the actual reference trajectory // if not apply auxillary control
-    #         self.pred_trj_healthy = self.check_pred_trj(x_opt,ref)
-            
-
-    #         if self.solver_status > 0:                                
-    #             self.mpc_safe_count = 0
-    #             self.reset_mpc_optimizer()                
-    #         else: 
-    #             self.mpc_safe_count = self.mpc_safe_count + 1
-    #         ###### check the number of success rounds of the MPC optimization
-    #         if self.mpc_safe_count < self.mpc_safe_count_threshold:
-    #             return
-
-    #         if not self.pred_trj_healthy:
-    #             return
-
-    #         self.optimization_dt += time.time() - tic
-    #         print("MPC thread. Seq: %d. Topt: %.4f" % (odom.header.seq, (time.time() - tic) * 1000))            
-    #         control_msg = AckermannDrive()
-    #         control_msg = next_control.drive                                                                     
-    #         steering_val = max(min(self.steering_rate_max, next_control.drive.steering_angle_velocity), self.steering_rate_min)                        
-    #         control_msg.steering_angle = max(min(self.steering_max, steering_val*0.1 + self.steering), self.steering_min)                        
-    #         tt_steering = Float64()
-    #         tt_steering.data = -1*control_msg.steering_angle            
-    #         # control_msg.acceleration = -110.0
-    #         self.steering_pub.publish(tt_steering)            
-    #         self.control_pub.publish(control_msg)            
-            
-
-    #     except KeyError:
-    #         self.recording_warmup = True
-    #         # Should not happen anymore.
-    #         rospy.logwarn("Tried to run an MPC optimization but MPC is not ready yet.")
-    #         return
-
-    #     if w_opt is not None:            
-    #         self.w_opt = w_opt            
+              
         
 
     def odom_callback(self, msg):
@@ -327,6 +253,8 @@ class GPMPCWrapper:
             marker_refs.markers.append(marker_ref)
             i+=1
         self.mpc_predicted_trj_publisher.publish(marker_refs)
+
+ 
         
  
      

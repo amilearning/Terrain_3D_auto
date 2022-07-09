@@ -13,15 +13,15 @@ pkg_dir = rospack.get_path('mpc_gp')
 
 class GPMPCModel:
     def __init__(self,model_build = False, N = 20, dt = 0.1, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False):
+
+        solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
+        self.N = N
+        self.dt = dt
+        self.lr = 0.45
+        self.lf = 0.45
+        self.mass = 25.0
         try:
             # solver_dir = pkg_dir+"/FORCESNLPsolver"
-            solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
-            self.N = N
-            self.dt = dt
-            self.lr = 0.45
-            self.lf = 0.45
-            self.mass = 25.0
-
             self.load_model()
             if(model_build):
                 self.model_build()            
