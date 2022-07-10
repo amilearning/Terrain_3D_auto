@@ -30,7 +30,7 @@ from autorally_msgs.msg import chassisState
 
 from mpc_gp.traj_gen import TrajManager
 from mpc_gp.mpc_model import GPMPCModel
-from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray
+from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray, predicted_trj_visualize, ref_to_markerArray
 from mpc_gp.dataloader import DataLoader
 
 import rospkg
@@ -47,7 +47,7 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.model_build_flag = rospy.get_param('~build_flat', default=False)             
+        self.model_build_flag = rospy.get_param('~build_flat', default=True)             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
          # x, y, vx, psi
         self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0]))
@@ -55,9 +55,9 @@ class GPMPCWrapper:
         # Initialize GP MPC         
 #################################################################
         self.MPCModel = GPMPCModel( model_build = self.model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
-        self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)            
+        self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)                    
         self.dataloader = DataLoader(input_dim = 2, state_dim = len(self.cur_x) )
-        self.odom_available           = False 
+        self.odom_available   = False 
         self.vehicle_status_available = False 
         self.waypoint_available = False 
         
@@ -82,6 +82,7 @@ class GPMPCWrapper:
         self.mpc_predicted_trj_publisher = rospy.Publisher("/mpc_pred_trajectory", MarkerArray, queue_size=2)
         self.mpc_ref_traj_publisher = rospy.Publisher("/mpc_ref_traj", MarkerArray, queue_size=2)
         self.final_ref_publisher = rospy.Publisher("/final_trajectory", MarkerArray, queue_size=2)    
+        self.xy_ref_publisher = rospy.Publisher("/mpc_xy_ref", MarkerArray, queue_size=2)    
         self.status_pub = rospy.Publisher(status_topic, Bool, queue_size=2)    
         self.debug_pub = rospy.Publisher("mpc_debug", PoseStamped, queue_size=2)    
         # Subscribers
@@ -100,7 +101,7 @@ class GPMPCWrapper:
         self.blend_min = 3
         self.blend_max = 5
         self.is_first_mpc = True
-
+        self.init_traj = True
         rate = rospy.Rate(1)     
         while not rospy.is_shutdown():
             # Publish if MPC is busy with a current trajectory
@@ -122,7 +123,6 @@ class GPMPCWrapper:
             messageToPring =  "file has been saved in " + str(save_path)
             rospy.loginfo(messageToPring)
 
-
     def obs_callback(self,msg):
         self.obs_pose = msg
 
@@ -131,30 +131,64 @@ class GPMPCWrapper:
             self.vehicle_status_available = True
         self.chassisState = data
         
+    def odom_callback(self, msg):
+        """                
+        :type msg: PoseStamped
+        """              
+        if self.odom_available is False:
+            self.odom_available = True 
+        self.odom = msg        
+        
     def waypoint_callback(self, msg):
         if self.waypoint_available is False:
             self.waypoint_available = True
         self.waypoint = msg
 
+    def trajGen_callback(self,timer):
+        if self.TrajManager is None:            
+            return 
+        if self.init_traj:
+            self.TrajManager.setState(self.cur_x)
+            self.init_traj = False
+        delta = 0.1
+        velocity = 1.5        
+        self.ref_state = self.TrajManager.gen_traj(delta, velocity)        
+        marker_refs = traj_to_markerArray(self.ref_state)        
+        self.mpc_ref_traj_publisher.publish(marker_refs)
+
+
     def run_mpc(self):
         if self.MPCModel is None:
             return        
-        xinit = self.cur_x
+        xinit = self.cur_x        
         if self.is_first_mpc:
-            self.is_first_mpc = False            
+            self.is_first_mpc = False
             x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3]])
             x0 = np.transpose(np.tile(x0i, (1, self.MPCModel.model.N)))
             problem = {"x0": x0,
                     "xinit": xinit}
         else:
             problem = {"xinit": xinit}                
-        obstacle_ = np.array([self.obs_pose.pose.pose.position.x, self.obs_pose.pose.pose.position.y])
-        goal_ = np.array([self.waypoint.pose.position.x, self.waypoint.pose.position.y])        
-        problem["all_parameters"] = np.transpose(np.tile(np.concatenate((goal_,obstacle_)),(1,self.MPCModel.model.N)))        
+        # obstacle_ = np.array([self.obs_pose.pose.pose.position.x, self.obs_pose.pose.pose.position.y])
+        # goal_ = np.array([self.waypoint.pose.position.x, self.waypoint.pose.position.y])       
+
+        # Compute Local Trajectory
+        cur_xy =  np.array([xinit[0],xinit[1]])
+        local_traj_points = self.TrajManager.extract_path_points(cur_xy,self.MPCModel.model.N)
+        local_tarj_marker = ref_to_markerArray(local_traj_points)      
+        self.xy_ref_publisher.publish(local_tarj_marker)  
+        ## Set ref trajectories
+        # problem["all_parameters"] = np.transpose(np.tile(goal_,(1,self.MPCModel.model.N)))        
+        problem["all_parameters"] =np.reshape(local_traj_points,(3*self.MPCModel.model.N,1))                
         output, exitflag, info = self.MPCModel.solver.solve(problem)
-        if exitflag != 1: 
-            sys.stderr.write("FORCESPRO took {} iterations and {} seconds to solve the problem.\n"\
-            .format(info.it, info.solvetime))            
+        
+        if exitflag != 1:             
+            sys.stderr.write("exitflag = {}\n".format(exitflag))
+            ctrl_cmd = vehicleCmd()
+            ctrl_cmd.header.stamp = rospy.Time.now()
+            ctrl_cmd.acceleration = -0.1
+            ctrl_cmd.steering =  self.chassisState.steering  #-1*u_pred[1,0]*0.05+self.chassisState.steering
+            self.control_pub.publish(ctrl_cmd)
             return
             
         temp = np.zeros((np.max(self.MPCModel.model.nvar), self.MPCModel.model.N))
@@ -163,12 +197,15 @@ class GPMPCWrapper:
         u_pred = temp[0:2, :]
         # x_pred = temp[2:7, :]
         x_pred = temp[2:6, :]
-        self.predicted_trj_visualize(x_pred)
+        pred_maerker_refs = predicted_trj_visualize(x_pred)
+        self.mpc_predicted_trj_publisher.publish(pred_maerker_refs)
+        
         
         ctrl_cmd = vehicleCmd()
         ctrl_cmd.header.stamp = rospy.Time.now()
         ctrl_cmd.acceleration = u_pred[0,0]
         ctrl_cmd.steering =  -1*u_pred[1,0]  #-1*u_pred[1,0]*0.05+self.chassisState.steering
+        
         self.control_pub.publish(ctrl_cmd)
 
         ########  Log State Data ###################################################
@@ -178,19 +215,7 @@ class GPMPCWrapper:
             rospy.loginfo("recording process %d",self.dataloader.n_data_set)
         ########  Log State Data END ###################################################
 
-
-    def trajGen_callback(self,timer):
-        if self.TrajManager is None:
-            return 
-        self.TrajManager.setState(self.cur_x)
-        delta = 0.1
-        velocity = 2.0        
-        self.ref_state = self.TrajManager.gen_traj(delta, velocity)        
-        marker_refs = traj_to_markerArray(self.ref_state)
-        self.mpc_ref_traj_publisher.publish(marker_refs)
-
     def cmd_callback(self,timer):
-        
         
         current_euler = get_odom_euler(self.odom)
         local_vel = get_local_vel(self.odom, is_odom_local_frame = True)
@@ -208,7 +233,7 @@ class GPMPCWrapper:
         elif self.odom_available is False:
             rospy.loginfo("Odom is not available yet")
             return
-        elif self.waypoint_available is False:
+        elif self.TrajManager.is_path_computed() is False:
             rospy.loginfo("Waypoints are not available yet")
             return
 
@@ -220,46 +245,6 @@ class GPMPCWrapper:
               
         
 
-    def odom_callback(self, msg):
-        """                
-        :type msg: PoseStamped
-        """              
-        if self.odom_available is False:
-            self.odom_available = True 
-        self.odom = msg        
-        
-    
-
-    def predicted_trj_visualize(self,predicted_state):        
-        marker_refs = MarkerArray() 
-        for i in range(len(predicted_state[0,:])):
-            marker_ref = Marker()
-            marker_ref.header.frame_id = "map"  
-            marker_ref.ns = "mpc_ref"+str(i)
-            marker_ref.id = i
-            marker_ref.type = Marker.ARROW
-            marker_ref.action = Marker.ADD                
-            marker_ref.pose.position.x = predicted_state[0,i] 
-            marker_ref.pose.position.y = predicted_state[1,i]              
-            quat_tmp = euler_to_quaternion(0.0, 0.0, predicted_state[3,i])     
-            quat_tmp = unit_quat(quat_tmp)                 
-            marker_ref.pose.orientation.w = quat_tmp[0]
-            marker_ref.pose.orientation.x = quat_tmp[1]
-            marker_ref.pose.orientation.y = quat_tmp[2]
-            marker_ref.pose.orientation.z = quat_tmp[3]
-            marker_ref.color.r, marker_ref.color.g, marker_ref.color.b = (255, 255, 0)
-            marker_ref.color.a = 0.5
-            marker_ref.scale.x, marker_ref.scale.y, marker_ref.scale.z = (0.6, 0.4, 0.3)
-            marker_refs.markers.append(marker_ref)
-            i+=1
-        self.mpc_predicted_trj_publisher.publish(marker_refs)
-
- 
-        
- 
-     
-        
-  
 ###################################################################################
 
 def main():

@@ -233,6 +233,8 @@ void LowlevelCtrl::ControlLoop()
           ;
           throttle_cmd = std::max(std::min(throttle_cmd,1.0),0.0);          
           brake_cmd = std::max(std::min(brake_cmd,1.0),0.0);          
+          double steering_cmd = vehicle_cmd.steering/(25*PI/180.0);
+          steering_cmd = std::max(std::min(steering_cmd,1.0),-1.0);          
         // }
         /////////////////// Control with Mapping END //////////////////
 
@@ -252,7 +254,7 @@ void LowlevelCtrl::ControlLoop()
           // throttle_cmd = manual_throttle;
         chassis_cmd.throttle = throttle_cmd;        
         chassis_cmd.frontBrake =brake_cmd;
-        chassis_cmd.steering =vehicle_cmd.steering/(25*PI/180.0);               
+        chassis_cmd.steering =steering_cmd;               
         chassisCmdPub.publish(chassis_cmd);
         
         

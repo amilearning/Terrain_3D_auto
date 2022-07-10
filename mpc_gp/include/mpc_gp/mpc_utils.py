@@ -107,8 +107,57 @@ def traj_to_markerArray(traj):
         marker_ref.pose.orientation.y = quat_tmp[2]
         marker_ref.pose.orientation.z = quat_tmp[3]
         marker_ref.color.r, marker_ref.color.g, marker_ref.color.b = (0, 255, 0)
-        marker_ref.color.a = 0.5
+        marker_ref.color.a = 0.2
         marker_ref.scale.x, marker_ref.scale.y, marker_ref.scale.z = (0.2, 0.2, 0.15)
+        marker_refs.markers.append(marker_ref)
+        
+
+    return marker_refs
+
+
+def predicted_trj_visualize(predicted_state):        
+    marker_refs = MarkerArray() 
+    for i in range(len(predicted_state[0,:])):
+        marker_ref = Marker()
+        marker_ref.header.frame_id = "map"  
+        marker_ref.ns = "mpc_ref"+str(i)
+        marker_ref.id = i
+        marker_ref.type = Marker.ARROW
+        marker_ref.action = Marker.ADD                
+        marker_ref.pose.position.x = predicted_state[0,i] 
+        marker_ref.pose.position.y = predicted_state[1,i]              
+        quat_tmp = euler_to_quaternion(0.0, 0.0, predicted_state[3,i])     
+        quat_tmp = unit_quat(quat_tmp)                 
+        marker_ref.pose.orientation.w = quat_tmp[0]
+        marker_ref.pose.orientation.x = quat_tmp[1]
+        marker_ref.pose.orientation.y = quat_tmp[2]
+        marker_ref.pose.orientation.z = quat_tmp[3]
+        marker_ref.color.r, marker_ref.color.g, marker_ref.color.b = (255, 255, 0)
+        marker_ref.color.a = 0.5        
+        # marker_ref.scale.x, marker_ref.scale.y, marker_ref.scale.z = (0.6, 0.4, 0.3)
+        marker_ref.scale.x = (i+1)/len(predicted_state[0,:])*0.1+0.1
+        marker_ref.scale.y = (i+1)/len(predicted_state[0,:])*0.1+0.1
+        marker_ref.scale.z = (i+1)/len(predicted_state[0,:])*0.1+0.1
+        marker_refs.markers.append(marker_ref)
+        i+=1
+    return marker_refs
+
+
+def ref_to_markerArray(traj):
+
+    marker_refs = MarkerArray() 
+    for i in range(len(traj[:,0])):
+        marker_ref = Marker()
+        marker_ref.header.frame_id = "map"  
+        marker_ref.ns = "ref_states_"+str(i)
+        marker_ref.id = i
+        marker_ref.type = Marker.SPHERE
+        marker_ref.action = Marker.ADD                
+        marker_ref.pose.position.x = traj[i,0] 
+        marker_ref.pose.position.y = traj[i,1]              
+        marker_ref.color.r, marker_ref.color.g, marker_ref.color.b = (0, 0, 255)
+        marker_ref.color.a = 0.5
+        marker_ref.scale.x, marker_ref.scale.y, marker_ref.scale.z = (0.1, 0.1, 0.1)
         marker_refs.markers.append(marker_ref)
         
 
