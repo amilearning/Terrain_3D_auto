@@ -3,7 +3,7 @@ import sys
 import os
 
 class DataLoader:
-    def __init__(self, input_dim = 2, state_dim = 4, dt = 0.05):                               
+    def __init__(self, input_dim = 2, state_dim = 5, dt = 0.05):                               
         self.Xstates = np.array((0,state_dim+input_dim))
         self.XpredStates = np.array((0,state_dim+input_dim))
         self.dt = dt

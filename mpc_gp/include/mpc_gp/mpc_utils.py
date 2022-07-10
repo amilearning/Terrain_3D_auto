@@ -71,7 +71,7 @@ def q_to_rot_mat(q):
     return rot_mat
 
 
-def get_local_vel(odom, is_odom_local_frame = True):
+def get_local_vel(odom, is_odom_local_frame = False):
     local_vel = np.array([0.0, 0.0, 0.0])
     if is_odom_local_frame is False: 
         # convert from global to local 

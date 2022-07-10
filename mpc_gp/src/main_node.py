@@ -30,7 +30,7 @@ from autorally_msgs.msg import chassisState
 
 from mpc_gp.traj_gen import TrajManager
 from mpc_gp.mpc_model import GPMPCModel
-from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray, predicted_trj_visualize, ref_to_markerArray
+from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray, predicted_trj_visualize, ref_to_markerArray, wrap_to_pi
 from mpc_gp.dataloader import DataLoader
 
 import rospkg
@@ -47,10 +47,10 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.model_build_flag = rospy.get_param('~build_flat', default=True)             
+        self.model_build_flag = rospy.get_param('~build_flat', default=False)             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
          # x, y, vx, psi
-        self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0]))
+        self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0, 0.0]))
 #################################################################        
         # Initialize GP MPC         
 #################################################################
@@ -130,6 +130,7 @@ class GPMPCWrapper:
         if self.vehicle_status_available is False:
             self.vehicle_status_available = True
         self.chassisState = data
+        self.steering = -data.steering*25*math.pi/180
         
     def odom_callback(self, msg):
         """                
@@ -150,8 +151,8 @@ class GPMPCWrapper:
         if self.init_traj:
             self.TrajManager.setState(self.cur_x)
             self.init_traj = False
-        delta = 0.1
-        velocity = 1.5        
+        delta = 0.05
+        velocity = 1.0
         self.ref_state = self.TrajManager.gen_traj(delta, velocity)        
         marker_refs = traj_to_markerArray(self.ref_state)        
         self.mpc_ref_traj_publisher.publish(marker_refs)
@@ -163,7 +164,7 @@ class GPMPCWrapper:
         xinit = self.cur_x        
         if self.is_first_mpc:
             self.is_first_mpc = False
-            x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3]])
+            x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3], xinit[4]])
             x0 = np.transpose(np.tile(x0i, (1, self.MPCModel.model.N)))
             problem = {"x0": x0,
                     "xinit": xinit}
@@ -187,7 +188,8 @@ class GPMPCWrapper:
             ctrl_cmd = vehicleCmd()
             ctrl_cmd.header.stamp = rospy.Time.now()
             ctrl_cmd.acceleration = -0.1
-            ctrl_cmd.steering =  self.chassisState.steering  #-1*u_pred[1,0]*0.05+self.chassisState.steering
+            target_steering = self.steering
+            ctrl_cmd.steering = -1*target_steering  #-1*u_pred[1,0]*0.05+self.chassisState.steering
             self.control_pub.publish(ctrl_cmd)
             return
             
@@ -195,8 +197,8 @@ class GPMPCWrapper:
         for i in range(0, self.MPCModel.model.N):
             temp[:, i] = output['x{0:02d}'.format(i+1)]
         u_pred = temp[0:2, :]
-        # x_pred = temp[2:7, :]
-        x_pred = temp[2:6, :]
+        x_pred = temp[2:7, :]
+        # x_pred = temp[2:6, :]
         pred_maerker_refs = predicted_trj_visualize(x_pred)
         self.mpc_predicted_trj_publisher.publish(pred_maerker_refs)
         
@@ -204,13 +206,13 @@ class GPMPCWrapper:
         ctrl_cmd = vehicleCmd()
         ctrl_cmd.header.stamp = rospy.Time.now()
         ctrl_cmd.acceleration = u_pred[0,0]
-        ctrl_cmd.steering =  -1*u_pred[1,0]  #-1*u_pred[1,0]*0.05+self.chassisState.steering
-        
+        target_steering = (u_pred[1,0]*self.dt+self.steering)# temp[6, 3] 
+        ctrl_cmd.steering = -target_steering        
         self.control_pub.publish(ctrl_cmd)
 
         ########  Log State Data ###################################################
         if self.logging:
-            add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3]])                    
+            add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3], xinit[4]])                    
             self.dataloader.append_state(add_state,temp[:,1])     
             rospy.loginfo("recording process %d",self.dataloader.n_data_set)
         ########  Log State Data END ###################################################
@@ -218,13 +220,14 @@ class GPMPCWrapper:
     def cmd_callback(self,timer):
         
         current_euler = get_odom_euler(self.odom)
-        local_vel = get_local_vel(self.odom, is_odom_local_frame = True)
+        current_euler[2] = wrap_to_pi(current_euler[2])
+        
+        local_vel = get_local_vel(self.odom, is_odom_local_frame = False)
         self.debug_msg.header.stamp = rospy.Time.now()
         self.debug_msg.pose.position.x = local_vel[0]
-        self.debug_msg.pose.position.y = local_vel[1]
-        self.debug_msg.pose.position.z = local_vel[2]
+        self.debug_msg.pose.position.y = current_euler[2]        
         self.debug_pub.publish(self.debug_msg)        
-        self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2]]))
+        self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2], self.steering]))
         
 
         if self.vehicle_status_available is False:

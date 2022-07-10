@@ -78,7 +78,7 @@ LowlevelCtrl::LowlevelCtrl(ros::NodeHandle& nh_ctrl, ros::NodeHandle& nh_signal)
   ctleffortSub = nh_signal_.subscribe("/control_effort", 50, &LowlevelCtrl::controleffortCallback, this);   
 
 
-  accCmdSub = nh_signal_.subscribe("/acc_cmd", 50, &LowlevelCtrl::accCabllback, this);   
+  accCmdSub = nh_signal_.subscribe("/acc_cmd", 2, &LowlevelCtrl::accCabllback, this);   
   odomSub = nh_signal_.subscribe("/ground_truth/state", 50, &LowlevelCtrl::odomCallback, this);   
 
 
