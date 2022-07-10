@@ -126,7 +126,7 @@ def predicted_trj_visualize(predicted_state):
         marker_ref.action = Marker.ADD                
         marker_ref.pose.position.x = predicted_state[0,i] 
         marker_ref.pose.position.y = predicted_state[1,i]              
-        quat_tmp = euler_to_quaternion(0.0, 0.0, predicted_state[3,i])     
+        quat_tmp = euler_to_quaternion(0.0, 0.0, predicted_state[2,i])     
         quat_tmp = unit_quat(quat_tmp)                 
         marker_ref.pose.orientation.w = quat_tmp[0]
         marker_ref.pose.orientation.x = quat_tmp[1]

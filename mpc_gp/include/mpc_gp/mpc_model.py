@@ -46,11 +46,11 @@ class GPMPCModel:
         return cost 
 
     def running_obj(self,z,p):
-        # return 1 * casadi.fabs(z[2] -p[0]) + 1 * casadi.fabs(z[3] - p[1]) +10 * casadi.fabs(z[5] - p[2]) + 0.1* z[0]**2+ 0.1* z[1]**2
-        return 1 * casadi.fabs(z[2] -p[0]) + 1 * casadi.fabs(z[3] - p[1])  +10 * casadi.fabs(z[5] - p[2])+ 10* z[0]**2+ 100* z[1]**2
-        # return 0.1 * z[0]**2 + 0.01 * z[1]**2
+        # z_states = x(2), y(3), psi(4), vx(5), vy(6), omega(7), delta(8), u = acc(0), delta_rate(1)        
+        return 1 * casadi.fabs(z[2] -p[0]) + 1 * casadi.fabs(z[3] - p[1])  +10 * casadi.fabs(z[4] - p[2])+ 10* z[0]**2+ 100* z[1]**2
+        
     def terminal_obj(self,z,p):
-        return 2 * casadi.fabs(z[2] -p[0]) + 2 * casadi.fabs(z[3] - p[1]) +20 * casadi.fabs(z[5] - p[2])
+        return 2 * casadi.fabs(z[2] -p[0]) + 2 * casadi.fabs(z[3] - p[1]) +20 * casadi.fabs(z[4] - p[2])
 
     def setState(self,x_np_array):
         self.xinit = np.transpose(x_np_array)
@@ -63,32 +63,30 @@ class GPMPCModel:
     def load_model(self):
         self.model = forcespro.nlp.SymbolicModel()
         self.model.N = self.N # horizon length
-        self.model.nvar = 7  # number of variables
-        self.model.neq = 5  # number of equality constraints
+        self.model.nvar = 9  # number of variables
+        self.model.neq = 7  # number of equality constraints
         # self.model.nh = 1  # number of inequality constraint functions
         self.model.npar = 3 # number of runtime parameters    
         # Objective function        
-        self.model.objective = self.running_obj #lambda z: 100 * casadi.fabs(z[2] -5.0) \
-                                   # + 100 * casadi.fabs(z[3] - 5.0) \
-                                   # + 0.1 * z[0]**2 + 0.01 * z[1]**2
+        self.model.objective = self.running_obj 
         self.model.objective = self.terminal_obj
         
         # We use an explicit RK4 integrator here to discretize continuous dynamics
         integrator_stepsize = self.dt
-        self.model.eq = lambda z: forcespro.nlp.integrate(self.continuous_dynamics, z[2:7], z[0:2],
+        self.model.eq = lambda z: forcespro.nlp.integrate(self.continuous_dynamics, z[2:9], z[0:2],
                                                     integrator=forcespro.nlp.integrators.RK4,
                                                     stepsize=integrator_stepsize)
         # Indices on LHS of dynamical constraint - for efficiency reasons, make
         # sure the matrix E has structure [0 I] where I is the identity matrix.
-        self.model.E = np.concatenate([np.zeros((5,2)), np.eye(5)], axis=1)
+        self.model.E = np.concatenate([np.zeros((7,2)), np.eye(7)], axis=1)
 
         # Inequality constraints
         # Simple bounds
         #  upper/lower variable bounds lb <= z <= ub
-        #                     inputs                 |  states
-        #                     F          phi                x            y     v             theta        delta
-        self.model.lb = np.array([-4.,  np.deg2rad(-40.),  -np.inf,   -np.inf,   -np.inf,  -np.inf, -0.437])
-        self.model.ub = np.array([+1.5,  np.deg2rad(+40.),   np.inf,   np.inf,    np.inf,    np.inf,  0.437])
+        #                     inputs                 |  states        
+        #                         accel,  delta_rate,   x(2), y(3), psi(4), vx(5), vy(6), omega(7), delta(8)
+        self.model.lb = np.array([-4.,  np.deg2rad(-40.),  -np.inf,   -np.inf,   -np.inf,  -np.inf, -np.inf,-np.inf, -0.437])
+        self.model.ub = np.array([+1.5,  np.deg2rad(+40.),   np.inf,   np.inf,    np.inf,    np.inf,  np.inf, np.inf, 0.437])
         # #                     a          delta                x            y     v             theta        
         # self.model.lb = np.array([-2.,  np.deg2rad(-25.),  -np.inf,   -np.inf,   -np.inf,  -np.inf])
         # self.model.ub = np.array([+1.5,  np.deg2rad(+25.),   np.inf,   np.inf,    np.inf,   np.inf])
@@ -98,7 +96,7 @@ class GPMPCModel:
         # self.model.hu = np.array([+np.inf])
         # self.model.hl = np.array([1.0**2])
         # Initial condition on vehicle states x
-        self.model.xinitidx = range(2,7) # use this to specify on which variables initial conditions
+        self.model.xinitidx = range(2,9) # use this to specify on which variables initial conditions
        
         
 
@@ -112,7 +110,7 @@ class GPMPCModel:
         codeoptions.timing = 1
         codeoptions.nlp.hessian_approximation = 'bfgs'
         codeoptions.solvemethod = 'SQP_NLP' # choose the solver method Sequential  
-        codeoptions.nlp.bfgs_init = 2.5*np.identity(7) # initialization of the hessian
+        codeoptions.nlp.bfgs_init = 1.5*np.identity(9) # initialization of the hessian
         #                             approximation
         # codeoptions.noVariableElimination = 1.       
         # codeoptions.sqp_nlp.reg_hessian = 100 # increase this if exitflag=-8
@@ -133,12 +131,19 @@ class GPMPCModel:
         m = self.mass   # mass of the car
 
         # set parameters
-        beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(x[4]))
-        # beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(u[1]))
+        # beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(x[4]))        
 
+#          u[0]accel,  u[1]delta_rate,   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
         # calculate dx/dt
-        return casadi.vertcat(  x[2] * casadi.cos(x[3] + beta),  # dxPos/dt = v*cos(theta+beta)
-                                x[2] * casadi.sin(x[3] + beta),  # dyPos/dt = v*sin(theta+beta)
-                                u[0],                        # dv/dt = F/m
-                                x[2]/l_r * casadi.sin(beta),     # dtheta/dt = v/l_r*sin(beta)
-                                u[1])                           # ddelta/dt = phi
+        return casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),
+                              x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),
+                              x[5],
+                              u[0],
+                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0]),
+                              (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0]),                                
+                              u[1])                           # ddelta/dt = phi
+
+                            # x[2] * casadi.cos(x[3] + beta),  # dxPos/dt = v*cos(theta+beta)
+                            #     x[2] * casadi.sin(x[3] + beta),  # dyPos/dt = v*sin(theta+beta)
+                            #     u[0],                        # dv/dt = F/m
+                            #     x[2]/l_r * casadi.sin(beta),     # dtheta/dt = v/l_r*sin(beta)

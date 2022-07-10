@@ -47,10 +47,10 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.model_build_flag = rospy.get_param('~build_flat', default=False)             
+        self.model_build_flag = rospy.get_param('~build_flat', default=True)             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
-         # x, y, vx, psi
-        self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0, 0.0]))
+         #   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
+        self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
 #################################################################        
         # Initialize GP MPC         
 #################################################################
@@ -176,7 +176,8 @@ class GPMPCWrapper:
         xinit = self.cur_x        
         if self.is_first_mpc:
             self.is_first_mpc = False
-            x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3], xinit[4]])
+#  u[0]accel,  u[1]delta_rate,   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
+            x0i = np.array([0.,0.,xinit[0],xinit[1], xinit[2], xinit[3], xinit[4], xinit[5],xinit[6]])
             x0 = np.transpose(np.tile(x0i, (1, self.MPCModel.model.N)))
             problem = {"x0": x0,
                     "xinit": xinit}
@@ -209,7 +210,7 @@ class GPMPCWrapper:
         for i in range(0, self.MPCModel.model.N):
             temp[:, i] = output['x{0:02d}'.format(i+1)]
         u_pred = temp[0:2, :]
-        x_pred = temp[2:7, :]
+        x_pred = temp[2:9, :]
         # x_pred = temp[2:6, :]
         pred_maerker_refs = predicted_trj_visualize(x_pred)
         self.mpc_predicted_trj_publisher.publish(pred_maerker_refs)
@@ -224,7 +225,7 @@ class GPMPCWrapper:
 
         ########  Log State Data ###################################################
         if self.logging:
-            add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3], xinit[4]])                    
+            add_state = np.array([u_pred[0,0],u_pred[1,0],xinit[0],xinit[1], xinit[2], xinit[3], xinit[4], xinit[5], xinit[6]])                    
             self.dataloader.append_state(add_state,temp[:,1])     
             rospy.loginfo("recording process %d",self.dataloader.n_data_set)
         ########  Log State Data END ###################################################
@@ -239,7 +240,8 @@ class GPMPCWrapper:
         self.debug_msg.pose.position.x = local_vel[0]
         self.debug_msg.pose.position.y = current_euler[2]        
         self.debug_pub.publish(self.debug_msg)        
-        self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y, local_vel[0], current_euler[2], self.steering]))
+        #  u[0]accel,  u[1]delta_rate,   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
+        self.cur_x = np.transpose(np.array([self.odom.pose.pose.position.x,self.odom.pose.pose.position.y,current_euler[2], local_vel[0], local_vel[1],self.odom.twist.twist.angular.z, self.steering]))
         
 
         if self.vehicle_status_available is False:

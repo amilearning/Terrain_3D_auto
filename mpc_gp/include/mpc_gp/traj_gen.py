@@ -28,10 +28,11 @@ class TrajManager:
         for i in range(self.n_sample*8):
             tmp_state = np.copy(trajs[-1,:]) 
             beta = math.atan(self.MPCModel.lr/(self.MPCModel.lf + self.MPCModel.lr) * math.tan(delta))
-            tmp_state[0] = trajs[-1,0] + self.dt*velocity*math.cos(tmp_state[3]+beta)
-            tmp_state[1] = trajs[-1,1] + self.dt*velocity*math.sin(tmp_state[3]+beta)
-            tmp_state[2] = velocity            
-            tmp_state[3] = wrap_to_pi(trajs[-1,3] + self.dt*velocity/self.MPCModel.lr * math.sin(beta))
+            tmp_state[0] = trajs[-1,0] + self.dt*velocity*math.cos(tmp_state[2]+beta)
+            tmp_state[1] = trajs[-1,1] + self.dt*velocity*math.sin(tmp_state[2]+beta)
+            tmp_state[2] = wrap_to_pi(trajs[-1,2] + self.dt*velocity/self.MPCModel.lr * math.sin(beta))
+            tmp_state[3] = velocity            
+            
             
             # if i > 0:                
             #     cum_dist = cum_dist +math.sqrt((trajs[-1,0]-tmp_state[0])**2+(trajs[-1,1]-tmp_state[1])**2)
@@ -51,7 +52,7 @@ class TrajManager:
 
     def extract_path_points(self,ref_pose,number_of_sample):
         idx = self.find_closest_idx(ref_pose)        
-        return self.traj[idx+1:idx+number_of_sample+1,[0,1,3]]
+        return self.traj[idx+1:idx+number_of_sample+1,[0,1,2]]
 
     def is_path_computed(self):
         if self.traj is None:
