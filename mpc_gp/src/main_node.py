@@ -94,8 +94,12 @@ class GPMPCWrapper:
         self.data_logging_sub = rospy.Subscriber("/mpc_data_logging", Bool, self.data_logging_callback)
 
         # Timers
-        self.TrajGen_timer = rospy.Timer(rospy.Duration(0.1), self.trajGen_callback) 
+        self.traj_dt = 0.1
+        self.TrajGen_timer = rospy.Timer(rospy.Duration(self.traj_dt), self.trajGen_callback) 
+        self.traj_random_count = 0
         self.local_traj = None
+        self.sample_delta  = 0.0
+        self.sample_velocity = 1.0
         # 20Hz control callback 
         self.cmd_timer = rospy.Timer(rospy.Duration(0.05), self.cmd_callback) 
         self.blend_min = 3
@@ -151,11 +155,19 @@ class GPMPCWrapper:
         if self.init_traj:
             self.TrajManager.setState(self.cur_x)
             self.init_traj = False
-        delta = 0.05
-        velocity = 1.0
-        self.ref_state = self.TrajManager.gen_traj(delta, velocity)        
+        path_duration = 2.5 # sec 
+        if self.traj_random_count > path_duration/self.traj_dt:
+            self.traj_random_count = 0
+            self.TrajManager.setState(self.cur_x)
+            self.sample_delta    = self.sample_delta + (np.random.rand(1)[0]-0.5)*0.025
+            self.sample_delta = max(min(self.sample_delta,25*np.pi/180.0),-25*np.pi/180)
+            self.sample_velocity = self.sample_velocity + (np.random.rand(1)[0]-0.5)*0.2
+            self.sample_velocity = max(min(self.sample_velocity,0.0),1.5)
+
+        self.ref_state = self.TrajManager.gen_traj(self.sample_delta, self.sample_velocity)        
         marker_refs = traj_to_markerArray(self.ref_state)        
         self.mpc_ref_traj_publisher.publish(marker_refs)
+        self.traj_random_count+=1
 
 
     def run_mpc(self):
