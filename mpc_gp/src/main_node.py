@@ -205,9 +205,11 @@ class GPMPCWrapper:
         self.xy_ref_publisher.publish(local_tarj_marker)  
         ## Set ref trajectories
         # problem["all_parameters"] = np.transpose(np.tile(goal_,(1,self.MPCModel.model.N)))        
-        problem["all_parameters"] =np.reshape(local_traj_points,(3*self.MPCModel.model.N,1))                
+        problem["all_parameters"] =np.reshape(local_traj_points,(3*self.MPCModel.model.N,1))       
+        start = time.time()                 
         output, exitflag, info = self.MPCModel.solver.solve(problem)
-        
+        end = time.time()
+        print("time: {:.5f}".format( end-start))
         if exitflag != 1:             
             sys.stderr.write("exitflag = {}\n".format(exitflag))
             ctrl_cmd = vehicleCmd()

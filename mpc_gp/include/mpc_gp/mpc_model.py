@@ -153,7 +153,7 @@ class GPMPCModel:
 
         # gp_input = np.array([[1,2,3,4,5,6]])
         
-        gpinput = (casadi.vertcat(u[0],u[1],x[3],x[4],x[5],x[6]).T - self.xsm.reshape(1,-1)) / self.xss.reshape(1,-1)
+        gpinput = (casadi.vertcat(u[0],u[1],x[3],x[4],x[5],x[6]).T - self.xsm.reshape(1,-1)) / self.xss.reshape(1,-1)*100.0
         
         # error_vx,error_vy, error_omega = self.eval_gp(gp_input)
 
@@ -161,7 +161,7 @@ class GPMPCModel:
                               x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),  # y 
                               x[5],                                         # psi       
                               u[0]+self.vxgp(gpinput)[0],                                         # vx 
-                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0])+self.vygp(gpinput)[0],        # vy  +gp_vx(1.0)
+                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0])+self.vygp(gpinput)[0],        # vy  
                               (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0])+self.omegagp(gpinput)[0],        # omega                   
                               u[1])                           # ddelta/dt = phi
 

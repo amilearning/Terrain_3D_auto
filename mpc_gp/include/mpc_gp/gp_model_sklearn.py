@@ -94,8 +94,7 @@ def loadGPModel(name, model, xscaler, yscaler, kernel='RBF'):
         raise NotImplementedError
 
     y_mu = cs.mtimes(K, model.alpha_) + model._y_train_mean
-    # y_mu = y_mu * yscaler.scale_ + yscaler.mean_
-    y_mu = y_mu * 1.0 + 0.0
+    y_mu = y_mu * yscaler.scale_ + yscaler.mean_
 
     # variance
     L_inv = solve_triangular(model.L_.T,np.eye(model.L_.shape[0]))

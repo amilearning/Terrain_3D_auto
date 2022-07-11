@@ -29,5 +29,13 @@
       <!-- <pose>0 0 0 0 0.08727 0</pose> -->
       <pose>0 0 0 0 0 0</pose>
     </include>
+    <physics name='default_physics' default='0' type='ode'>
+<!--  the max step size is set to 0.001 by default. -->
+<!--  When increasing it, the simulation quality may suffer. -->
+      <max_step_size>0.002</max_step_size>
+<!--  this factor actually is computed by multiplying the other two -->
+      <real_time_factor>0.6</real_time_factor>
+      <real_time_update_rate>300</real_time_update_rate>
+    </physics>
   </world>
 </sdf>
