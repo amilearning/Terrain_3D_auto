@@ -32,6 +32,7 @@ from mpc_gp.traj_gen import TrajManager
 from mpc_gp.mpc_model import GPMPCModel
 from mpc_gp.mpc_utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, traj_to_markerArray, predicted_trj_visualize, ref_to_markerArray, wrap_to_pi
 from mpc_gp.dataloader import DataLoader
+from mpc_gp.gp_model_sklearn import GPModel
 
 import rospkg
 rospack = rospkg.RosPack()
@@ -47,16 +48,27 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.model_build_flag = rospy.get_param('~build_flat', default=True)             
+        self.mpc_model_build_flag = rospy.get_param('~mpc_build_flat', default=True)             
+        self.GP_build_flag = rospy.get_param('~gp_build_flat', default=True)   
+        self.gp_train_data_file = rospy.get_param('~gp_train_data_file', default="test_data.npz")   
+        self.gp_model_file = rospy.get_param('~gp_model_file', default="GP_.pth")   
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
          #   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
         self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
 #################################################################        
-        # Initialize GP MPC         
+        # Initialize GP         
 #################################################################
-        self.MPCModel = GPMPCModel( model_build = self.model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
+        ##############################################
+        self.GPmodel = GPModel()                
+        if self.GP_build_flag:
+            self.GPmodel.all_model_build_and_save()            
+        else:
+            self.GPmodel.all_model_load()
+        ##################################################################
+        self.MPCModel = GPMPCModel(gpmodel = self.GPmodel, model_build = self.mpc_model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
         self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)                    
         self.dataloader = DataLoader(input_dim = 2, state_dim = len(self.cur_x) )
+        
         self.odom_available   = False 
         self.vehicle_status_available = False 
         self.waypoint_available = False 

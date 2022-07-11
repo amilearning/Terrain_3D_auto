@@ -6,20 +6,27 @@ import casadi
 import sys
 import os
 import rospkg
+
 rospack = rospkg.RosPack()
 pkg_dir = rospack.get_path('mpc_gp')
 
 
 
 class GPMPCModel:
-    def __init__(self,model_build = False, N = 20, dt = 0.05, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False):
-
+    def __init__(self,gpmodel = None, model_build = False, N = 20, dt = 0.05, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False):
+        self.gpmodel = gpmodel
         solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
         self.N = N
         self.dt = dt
         self.lr = 0.23
         self.lf = 0.34
         self.mass = 25.0
+        self.vxgp, self.vygp, self.omegagp = self.gpmodel.get_casadi_gps()
+        self.xscale = self.gpmodel.vx_xscalar
+        self.xss = self.xscale.scale_
+        self.xsm = self.xscale.mean_
+        # self.yscale = self.gpmodel.vx_yscalar
+
         try:
             # solver_dir = pkg_dir+"/FORCESNLPsolver"
             self.load_model()
@@ -36,7 +43,12 @@ class GPMPCModel:
         # self.xinit = np.transpose(np.array([-2.,0.,0.,np.deg2rad(90)]))
         # self.problem = {"x0": self.x0,
         #     "xinit": self.xinit}
-    
+    # def eval_gp(self,x_test):
+    #     # x_test_numpy = 
+    #     y_predicted_mean = self.gp_model.gp_eval(x_test)
+    #     ##return  e_vx, e_vy, e_omega
+    #     return y_predicted_mean[0][0], y_predicted_mean[0][1], y_predicted_mean[0][2]
+
     def traversability_cost(self,z):
         A = np.zeros(1e3)
         A[2] = 1e5        
@@ -52,6 +64,9 @@ class GPMPCModel:
     def terminal_obj(self,z,p):
         return 2 * casadi.fabs(z[2] -p[0]) + 2 * casadi.fabs(z[3] - p[1]) +20 * casadi.fabs(z[4] - p[2])
 
+    def fake_function(self,p):
+        p = p-2+32-p**2
+        return p
     def setState(self,x_np_array):
         self.xinit = np.transpose(x_np_array)
         self.problem["xinit"] = self.xinit
@@ -73,7 +88,7 @@ class GPMPCModel:
         
         # We use an explicit RK4 integrator here to discretize continuous dynamics
         integrator_stepsize = self.dt
-        self.model.eq = lambda z: forcespro.nlp.integrate(self.continuous_dynamics, z[2:9], z[0:2],
+        self.model.eq = lambda z,p: forcespro.nlp.integrate(self.continuous_dynamics, z[2:9], z[0:2],p,
                                                     integrator=forcespro.nlp.integrators.RK4,
                                                     stepsize=integrator_stepsize)
         # Indices on LHS of dynamical constraint - for efficiency reasons, make
@@ -119,7 +134,7 @@ class GPMPCModel:
         # server to generate new solver
         self.solver = self.model.generate_solver(options=codeoptions)
 
-    def continuous_dynamics(self,x, u):
+    def continuous_dynamics(self,x, u,p):
         """Defines dynamics of the car, i.e. equality constraints.
         parameters:
         state x = [xPos,yPos,v,theta,delta]
@@ -135,12 +150,19 @@ class GPMPCModel:
 
 #          u[0]accel,  u[1]delta_rate,   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
         # calculate dx/dt
-        return casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),
-                              x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),
-                              x[5],
-                              u[0],
-                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0]),
-                              (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0]),                                
+
+        # gp_input = np.array([[1,2,3,4,5,6]])
+        
+        gpinput = (casadi.vertcat(u[0],u[1],x[3],x[4],x[5],x[6]).T - self.xsm.reshape(1,-1)) / self.xss.reshape(1,-1)
+        
+        # error_vx,error_vy, error_omega = self.eval_gp(gp_input)
+
+        return casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),  # x
+                              x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),  # y 
+                              x[5],                                         # psi       
+                              u[0]+self.vxgp(gpinput)[0],                                         # vx 
+                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0])+self.vygp(gpinput)[0],        # vy  +gp_vx(1.0)
+                              (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0])+self.omegagp(gpinput)[0],        # omega                   
                               u[1])                           # ddelta/dt = phi
 
                             # x[2] * casadi.cos(x[3] + beta),  # dxPos/dt = v*cos(theta+beta)
