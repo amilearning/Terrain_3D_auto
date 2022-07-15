@@ -172,7 +172,7 @@ bool TraversabilityMap::setElevationMap(const grid_map_msgs::GridMap& msg) {
   if(!elevationMapInitialized_){
     grid_map::GridMap global_map({"elevation","terrain_traversability"}); 
     global_map.setFrameId("map");
-    global_map.setGeometry(Eigen::Array2d(global_map_size_, global_map_size_), elevationMap.getResolution(), elevationMap.getPosition());
+    global_map.setGeometry(Eigen::Array2d(global_map_size_/elevationMap.getResolution(), global_map_size_/elevationMap.getResolution()), elevationMap.getResolution(), elevationMap.getPosition());
     GlobalMap_ = global_map;
   }
   elevationMapInitialized_ = true;

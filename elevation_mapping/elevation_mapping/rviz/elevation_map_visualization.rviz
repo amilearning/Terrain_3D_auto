@@ -3,10 +3,7 @@ Panels:
     Help Height: 70
     Name: Displays
     Property Tree Widget:
-      Expanded:
-        - /Odometry1/Shape1
-        - /Odometry1/Covariance1
-        - /GridMap1
+      Expanded: ~
       Splitter Ratio: 0.6638889908790588
     Tree Height: 420
   - Class: rviz/Selection
@@ -21,7 +18,6 @@ Panels:
   - Class: rviz/Views
     Expanded:
       - /Current View1
-      - /Current View1/Focal Point1
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
@@ -51,337 +47,347 @@ Visualization Manager:
         Y: 0
         Z: 0
       Plane: XY
-      Plane Cell Count: 20
+      Plane Cell Count: 100
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rviz/TF
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/Marker
+          Enabled: true
+          Marker Topic: /astar_path
+          Name: astar_path
+          Namespaces:
+            "": true
+          Queue Size: 100
+          Value: true
       Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: true
-        base_link:
+      Name: Plan
+    - Class: rviz/Group
+      Displays:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Class: grid_map_rviz_plugin/GridMap
+          Color: 200; 200; 200
+          Color Layer: terrain_traversability
+          Color Transformer: GridMapLayer
+          Enabled: true
+          Height Layer: elevation
+          Height Transformer: GridMapLayer
+          History Length: 1
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Max Intensity: 10
+          Min Color: 0; 0; 0
+          Min Intensity: 0
+          Name: local_trav_map
+          Show Grid Lines: true
+          Topic: /traversability_estimation/terrain_map
+          Unreliable: false
+          Use Rainbow: true
           Value: true
-        camera_link:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Class: grid_map_rviz_plugin/GridMap
+          Color: 200; 200; 200
+          Color Layer: terrain_traversability
+          Color Transformer: GridMapLayer
+          Enabled: true
+          Height Layer: elevation
+          Height Transformer: GridMapLayer
+          History Length: 1
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Max Intensity: 10
+          Min Color: 0; 0; 0
+          Min Intensity: 0
+          Name: global_trav_map
+          Show Grid Lines: true
+          Topic: /traversability_estimation/global_map
+          Unreliable: false
+          Use Rainbow: false
           Value: true
-        camera_link_fix:
+      Enabled: true
+      Name: Mapping
+    - Class: rviz/Group
+      Displays:
+        - Class: rviz/Image
+          Enabled: true
+          Image Topic: /left_camera/image_raw
+          Max Value: 1
+          Median window: 5
+          Min Value: 0
+          Name: Image
+          Normalize Range: true
+          Queue Size: 2
+          Transport Hint: raw
+          Unreliable: false
           Value: true
-        camera_link_fix1:
-          Value: true
-        camera_link_fix2:
-          Value: true
-        camera_link_fix3:
-          Value: true
-        camera_link_fix4:
-          Value: true
-        camera_link_fix5:
-          Value: true
-        chassis:
-          Value: true
-        gps_link:
-          Value: true
-        imu_link:
-          Value: true
-        left_front_axle_carrier:
-          Value: true
-        left_front_wheel:
-          Value: true
-        left_rear_axle_carrier:
-          Value: true
-        left_rear_wheel:
-          Value: true
-        left_steering_link:
-          Value: true
-        map:
-          Value: true
-        odom_ground_truth:
-          Value: true
-        right_front_axle_carrier:
-          Value: true
-        right_front_wheel:
-          Value: true
-        right_rear_axle_carrier:
-          Value: true
-        right_rear_wheel:
-          Value: true
-        right_steering_link:
-          Value: true
-        velodyne:
-          Value: true
-        velodyne_base_link:
-          Value: true
-      Marker Scale: 0.30000001192092896
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: false
-      Tree:
-        map:
-          base_link:
+        - Class: rviz/TF
+          Enabled: true
+          Frame Timeout: 15
+          Frames:
+            All Enabled: false
+            base_link:
+              Value: true
             camera_link:
-              camera_link_fix:
-                {}
-              camera_link_fix1:
-                {}
-              camera_link_fix2:
-                {}
-              camera_link_fix3:
-                {}
-              camera_link_fix4:
-                {}
-              camera_link_fix5:
-                {}
+              Value: true
+            camera_link_fix:
+              Value: true
+            camera_link_fix1:
+              Value: true
+            camera_link_fix2:
+              Value: true
+            camera_link_fix3:
+              Value: true
+            camera_link_fix4:
+              Value: true
+            camera_link_fix5:
+              Value: true
             chassis:
-              left_rear_axle_carrier:
-                left_rear_wheel:
-                  {}
-              left_steering_link:
-                left_front_axle_carrier:
-                  left_front_wheel:
-                    {}
-              right_rear_axle_carrier:
-                right_rear_wheel:
-                  {}
-              right_steering_link:
-                right_front_axle_carrier:
-                  right_front_wheel:
-                    {}
+              Value: true
             gps_link:
-              {}
+              Value: true
             imu_link:
-              {}
+              Value: true
+            left_front_axle_carrier:
+              Value: false
+            left_front_wheel:
+              Value: false
+            left_rear_axle_carrier:
+              Value: false
+            left_rear_wheel:
+              Value: false
+            left_steering_link:
+              Value: false
+            map:
+              Value: true
             odom_ground_truth:
-              {}
+              Value: false
+            right_front_axle_carrier:
+              Value: false
+            right_front_wheel:
+              Value: false
+            right_rear_axle_carrier:
+              Value: false
+            right_rear_wheel:
+              Value: false
+            right_steering_link:
+              Value: false
+            velodyne:
+              Value: true
             velodyne_base_link:
-              velodyne:
-                {}
-      Update Interval: 0
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: false
-      Class: grid_map_rviz_plugin/GridMap
-      Color: 200; 200; 200
-      Color Layer: uncertainty_range
-      Color Transformer: GridMapLayer
-      Enabled: false
-      Height Layer: elevation
-      Height Transformer: GridMapLayer
-      History Length: 1
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 0.10000000149011612
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: Elevation Map
-      Show Grid Lines: true
-      Topic: /elevation_mapping/elevation_map
-      Unreliable: false
-      Use Rainbow: true
-      Value: false
-    - Class: rviz/Marker
-      Enabled: false
-      Marker Topic: /elevation_map_raw_visualization/map_region
-      Name: Elevation Map Region
-      Namespaces:
-        {}
-      Queue Size: 100
-      Value: false
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: intensity
-      Class: rviz/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Min Color: 0; 0; 0
-      Name: PointCloud2
-      Position Transformer: XYZ
-      Queue Size: 10
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.10000000149011612
-      Style: Squares
-      Topic: /velodyne_points
-      Unreliable: false
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: false
-    - Angle Tolerance: 0.10000000149011612
-      Class: rviz/Odometry
-      Covariance:
-        Orientation:
-          Alpha: 0.5
-          Color: 255; 255; 127
-          Color Style: Unique
-          Frame: Local
-          Offset: 1
-          Scale: 1
+              Value: false
+          Marker Scale: 1
+          Name: TF
+          Show Arrows: true
+          Show Axes: true
+          Show Names: true
+          Tree:
+            map:
+              base_link:
+                camera_link:
+                  camera_link_fix:
+                    {}
+                  camera_link_fix1:
+                    {}
+                  camera_link_fix2:
+                    {}
+                  camera_link_fix3:
+                    {}
+                  camera_link_fix4:
+                    {}
+                  camera_link_fix5:
+                    {}
+                chassis:
+                  left_rear_axle_carrier:
+                    left_rear_wheel:
+                      {}
+                  left_steering_link:
+                    left_front_axle_carrier:
+                      left_front_wheel:
+                        {}
+                  right_rear_axle_carrier:
+                    right_rear_wheel:
+                      {}
+                  right_steering_link:
+                    right_front_axle_carrier:
+                      right_front_wheel:
+                        {}
+                gps_link:
+                  {}
+                imu_link:
+                  {}
+                odom_ground_truth:
+                  {}
+                velodyne_base_link:
+                  velodyne:
+                    {}
+          Update Interval: 0
           Value: true
-        Position:
-          Alpha: 0.30000001192092896
-          Color: 204; 51; 204
-          Scale: 1
+        - Angle Tolerance: 0.10000000149011612
+          Class: rviz/Odometry
+          Covariance:
+            Orientation:
+              Alpha: 0.5
+              Color: 255; 255; 127
+              Color Style: Unique
+              Frame: Local
+              Offset: 1
+              Scale: 1
+              Value: true
+            Position:
+              Alpha: 0.30000001192092896
+              Color: 204; 51; 204
+              Scale: 1
+              Value: true
+            Value: true
+          Enabled: true
+          Keep: 1
+          Name: Odometry
+          Position Tolerance: 0.10000000149011612
+          Shape:
+            Alpha: 1
+            Axes Length: 1
+            Axes Radius: 0.10000000149011612
+            Color: 85; 255; 127
+            Head Length: 0.30000001192092896
+            Head Radius: 0.10000000149011612
+            Shaft Length: 1
+            Shaft Radius: 0.05000000074505806
+            Value: Arrow
+          Topic: /ground_truth/state
+          Unreliable: false
           Value: true
-        Value: true
-      Enabled: true
-      Keep: 1
-      Name: Odometry
-      Position Tolerance: 0.10000000149011612
-      Shape:
-        Alpha: 1
-        Axes Length: 1
-        Axes Radius: 0.10000000149011612
-        Color: 85; 255; 127
-        Head Length: 0.30000001192092896
-        Head Radius: 0.10000000149011612
-        Shaft Length: 1
-        Shaft Radius: 0.05000000074505806
-        Value: Arrow
-      Topic: /ground_truth/state
-      Unreliable: false
-      Value: true
-    - Class: rviz/TF
-      Enabled: true
-      Frame Timeout: 15
-      Frames:
-        All Enabled: false
-        base_link:
-          Value: true
-        camera_link:
-          Value: true
-        camera_link_fix:
-          Value: true
-        camera_link_fix1:
-          Value: true
-        camera_link_fix2:
-          Value: true
-        camera_link_fix3:
-          Value: true
-        camera_link_fix4:
-          Value: true
-        camera_link_fix5:
-          Value: true
-        chassis:
-          Value: true
-        gps_link:
-          Value: true
-        imu_link:
-          Value: true
-        left_front_axle_carrier:
+        - Alpha: 1
+          Autocompute Intensity Bounds: true
+          Autocompute Value Bounds:
+            Max Value: 10
+            Min Value: -10
+            Value: true
+          Axis: Z
+          Channel Name: intensity
+          Class: rviz/PointCloud2
+          Color: 255; 255; 255
+          Color Transformer: Intensity
+          Decay Time: 0
+          Enabled: false
+          Invert Rainbow: false
+          Max Color: 255; 255; 255
+          Min Color: 0; 0; 0
+          Name: PointCloud2
+          Position Transformer: XYZ
+          Queue Size: 10
+          Selectable: true
+          Size (Pixels): 3
+          Size (m): 0.10000000149011612
+          Style: Squares
+          Topic: /velodyne_points
+          Unreliable: false
+          Use Fixed Frame: true
+          Use rainbow: true
           Value: false
-        left_front_wheel:
-          Value: false
-        left_rear_axle_carrier:
-          Value: false
-        left_rear_wheel:
-          Value: false
-        left_steering_link:
-          Value: false
-        map:
-          Value: true
-        odom_ground_truth:
-          Value: false
-        right_front_axle_carrier:
-          Value: false
-        right_front_wheel:
-          Value: false
-        right_rear_axle_carrier:
-          Value: false
-        right_rear_wheel:
-          Value: false
-        right_steering_link:
-          Value: false
-        velodyne:
-          Value: true
-        velodyne_base_link:
-          Value: false
-      Marker Scale: 1
-      Name: TF
-      Show Arrows: true
-      Show Axes: true
-      Show Names: true
-      Tree:
-        map:
-          base_link:
+        - Alpha: 1
+          Class: rviz/RobotModel
+          Collision Enabled: false
+          Enabled: true
+          Links:
+            All Links Enabled: true
+            Expand Joint Details: false
+            Expand Link Details: false
+            Expand Tree: false
+            Link Tree Style: Links in Alphabetic Order
+            base_link:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
             camera_link:
-              camera_link_fix:
-                {}
-              camera_link_fix1:
-                {}
-              camera_link_fix2:
-                {}
-              camera_link_fix3:
-                {}
-              camera_link_fix4:
-                {}
-              camera_link_fix5:
-                {}
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
             chassis:
-              left_rear_axle_carrier:
-                left_rear_wheel:
-                  {}
-              left_steering_link:
-                left_front_axle_carrier:
-                  left_front_wheel:
-                    {}
-              right_rear_axle_carrier:
-                right_rear_wheel:
-                  {}
-              right_steering_link:
-                right_front_axle_carrier:
-                  right_front_wheel:
-                    {}
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
             gps_link:
-              {}
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
             imu_link:
-              {}
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            left_front_axle_carrier:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+            left_front_wheel:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            left_rear_axle_carrier:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+            left_rear_wheel:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            left_steering_link:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
             odom_ground_truth:
-              {}
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            right_front_axle_carrier:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+            right_front_wheel:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            right_rear_axle_carrier:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+            right_rear_wheel:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+            right_steering_link:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+            velodyne:
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
             velodyne_base_link:
-              velodyne:
-                {}
-      Update Interval: 0
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Class: grid_map_rviz_plugin/GridMap
-      Color: 200; 200; 200
-      Color Layer: terrain_traversability
-      Color Transformer: GridMapLayer
+              Alpha: 1
+              Show Axes: false
+              Show Trail: false
+              Value: true
+          Name: VehicleModel
+          Robot Description: robot_description
+          TF Prefix: ""
+          Update Interval: 0
+          Value: true
+          Visual Enabled: true
       Enabled: true
-      Height Layer: elevation
-      Height Transformer: GridMapLayer
-      History Length: 1
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
-      Max Intensity: 10
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: GridMap
-      Show Grid Lines: true
-      Topic: /traversability_estimation/terrain_map
-      Unreliable: false
-      Use Rainbow: false
-      Value: true
-    - Class: rviz/Image
-      Enabled: true
-      Image Topic: /left_camera/image_raw
-      Max Value: 1
-      Median window: 5
-      Min Value: 0
-      Name: Image
-      Normalize Range: true
-      Queue Size: 2
-      Transport Hint: raw
-      Unreliable: false
-      Value: true
+      Name: Sense
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -410,35 +416,35 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/ThirdPersonFollower
-      Distance: 22.331375122070312
+      Distance: 1.4877198934555054
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.3819427490234375
-        Y: 2.958646774291992
-        Z: -0.08741377294063568
+        X: -0.47071754932403564
+        Y: 0.4418943524360657
+        Z: 2.384185791015625e-6
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.0997992753982544
+      Pitch: 0.31479689478874207
       Target Frame: base_link
       Value: ThirdPersonFollower (rviz)
-      Yaw: 2.847388505935669
+      Yaw: 2.045395851135254
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
   Height: 1025
   Hide Left Dock: false
-  Hide Right Dock: true
+  Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000016a00000363fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000227000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065010000026a000001360000001600ffffff000000010000010f000001d0fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000003d000001d0000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073d0000003efc0100000002fb0000000800540069006d006501000000000000073d000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000005cd0000036300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd00000004000000000000015900000363fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c006100790073010000003d00000227000000c900fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065010000026a000001360000001600ffffff000000010000010f00000363fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d00000363000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000073d0000003efc0100000002fb0000000800540069006d006501000000000000073d000002eb00fffffffb0000000800540069006d00650100000000000004500000000000000000000004c90000036300000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -446,7 +452,7 @@ Window Geometry:
   Tool Properties:
     collapsed: false
   Views:
-    collapsed: true
+    collapsed: false
   Width: 1853
   X: 1987
   Y: 27

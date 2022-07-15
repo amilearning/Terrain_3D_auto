@@ -29,6 +29,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from grid_map_msgs.msg import GridMap
 from path_planner.utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, wrap_to_pi, create_line_strip_marker
 from path_planner.astar import Astar
+from path_planner.hybrid_astar import HybridAstar
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -39,8 +40,13 @@ def clamp(n, minn, maxn):
 
 class PathPlan:
     def __init__(self,planner="astar"):
-        
-        self.Astar = Astar()
+        if planner == "astar":
+            self.planner = Astar()
+        elif planner == "hybrid_astar":
+            self.planner = HybridAstar()
+        else:
+            rospy.logerr("unkown planner")
+            return 
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)           
         self.odom_available           = False 
         
@@ -56,7 +62,8 @@ class PathPlan:
         vehicle_status_topic = "/chassisState"                  
         goal_topic = "/move_base_simple/goal"                
         obs_topic = "/initialpose"       
-        map_topic = "/traversability_estimation/terrain_map"
+        # map_topic = "/traversability_estimation/terrain_map"
+        map_topic = "/traversability_estimation/global_map"        
         status_topic = "/planner_status"
         self.layer_name = "terrain_traversability"
 
@@ -95,11 +102,11 @@ class PathPlan:
         
 
     def run_planning(self):
-        self.Astar.set_goal(self.goal_point)
-        self.Astar.set_pose(self.cur_pose)    
-        self.Astar.set_map(self.trav_map, self.grid_map.info)
+        self.planner.set_goal(self.goal_point)
+        self.planner.set_pose(self.cur_pose)    
+        self.planner.set_map(self.trav_map, self.grid_map.info)
         start = time.time()                 
-        path, path_idx = self.Astar.path_plan()
+        path, path_idx = self.planner.path_plan()
         end = time.time()       
         print("Planning time: {:.5f}".format( end-start))          
         path_marker = create_line_strip_marker(path)
