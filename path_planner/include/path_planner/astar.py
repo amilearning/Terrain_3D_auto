@@ -1,136 +1,163 @@
 import numpy as np
-from regex import P
-import forcespro
-import forcespro.nlp
-import casadi
 import sys
 import os
-import rospkg
-rospack = rospkg.RosPack()
-pkg_dir = rospack.get_path('mpc_gp')
+import math
+from heapq import heappush, heappop
+from path_planner.utils import dist2d
 
-
-
-class GPMPCModel:
-    def __init__(self,model_build = False, N = 20, dt = 0.1, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False):
-        try:
+class Astar:
+    def __init__(self):
             # solver_dir = pkg_dir+"/FORCESNLPsolver"
-            solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
-            self.N = N
-            self.dt = dt
-            self.load_model()
-            if(model_build):
-                self.model_build()            
-            else:
-                self.solver = forcespro.nlp.Solver.from_directory(solver_dir)                        
-        except:            
-            print("prebuilt solver not found")            
-            self.model_build()  
+        self.start_pose = None
+        self.goal_pose = None
+        self.trav_map = None
+                
+        self.grid_map = None
+        self.c_size = None
+        self.r_size = None
+        self.map_resolution = None
+        self.movement = '8N'
+        self.grid_visited = None
+
+    def set_map(self,map, map_info):
+        self.trav_map = map
+        self.trav_map.data = np.where(np.isnan(self.trav_map.data),0,self.trav_map.data)
+        self.grid_visited = np.zeros([len(self.trav_map.data)])
+        self.c_size  = self.trav_map.layout.dim[0].size
+        self.r_size  = self.trav_map.layout.dim[1].size
+        self.map_info = map_info
+        self.map_resolution = self.map_info.resolution         
         
-        self.x0i = np.array([0.,0.,-1.5,1.5,1.,np.pi/4.])
-        self.x0 = np.transpose(np.tile(self.x0i, (1, self.model.N)))
-        self.xinit = np.transpose(np.array([-2.,0.,0.,np.deg2rad(90)]))
-        self.problem = {"x0": self.x0,
-            "xinit": self.xinit}
+
+    def set_pose(self,pose):
+        self.start_pose = pose
+
+    def set_goal(self,goal):
+        self.goal_pose = goal
     
-    def traversability_cost(self,z):
-        A = np.zeros(1e3)
-        A[2] = 1e5        
-        cost =0.0 
-        if z[2] > 1.0:
-            cost = 0.1        
-        return cost 
+    def _get_movements_4n(self):    
+        return [(self.map_info.resolution, 0, self.map_info.resolution),
+                (0, self.map_info.resolution, self.map_info.resolution),
+                (-self.map_info.resolution, 0, self.map_info.resolution),
+                (0, -self.map_info.resolution, self.map_info.resolution)]
 
-    def running_obj(self,z,p):
-        return 100 * casadi.fabs(z[2] -p[0]) + 100 * casadi.fabs(z[3] - p[1]) + 0.1 * z[0]**2 + 0.01 * z[1]**2
-        # return 0.1 * z[0]**2 + 0.01 * z[1]**2
-    def terminal_obj(self,z,p):
-        return 200 * casadi.fabs(z[2] -p[0]) + 200 * casadi.fabs(z[3] - p[1]) + 0.2 * z[0]**2 + 0.02 * z[1]**2
-
-    def setState(self,x_np_array):
-        self.xinit = np.transpose(x_np_array)
-        self.problem["xinit"] = self.xinit
-
-    def setParam(self,params_np_array):
-        params_np_array = np.array([2.5, 2.5])        
-        self.problem["all_parameters"] = np.transpose(np.tile(params_np_array,(1,self.model.N)))
-
-    def load_model(self):
-        self.model = forcespro.nlp.SymbolicModel()
-        self.model.N = self.N # horizon length
-        self.model.nvar = 6  # number of variables
-        self.model.neq = 4  # number of equality constraints
-        self.model.nh = 1  # number of inequality constraint functions
-        self.model.npar = 4 # number of runtime parameters    
-        # Objective function        
-        self.model.objective = self.running_obj #lambda z: 100 * casadi.fabs(z[2] -5.0) \
-                                   # + 100 * casadi.fabs(z[3] - 5.0) \
-                                   # + 0.1 * z[0]**2 + 0.01 * z[1]**2
-        self.model.objective = self.terminal_obj
+    def _get_movements_8n(self):
+        s2 = self.map_info.resolution*math.sqrt(2)
+        return [(self.map_info.resolution, 0, self.map_info.resolution),
+                (0, self.map_info.resolution, self.map_info.resolution),
+                (-self.map_info.resolution, 0, self.map_info.resolution),
+                (0, -self.map_info.resolution, self.map_info.resolution),
+                (self.map_info.resolution, self.map_info.resolution, s2),
+                (-self.map_info.resolution, self.map_info.resolution, s2),
+                (-self.map_info.resolution, -self.map_info.resolution, s2),
+                (self.map_info.resolution, -self.map_info.resolution, s2)]
         
-        # We use an explicit RK4 integrator here to discretize continuous dynamics
-        integrator_stepsize = self.dt
-        self.model.eq = lambda z: forcespro.nlp.integrate(self.continuous_dynamics, z[2:6], z[0:2],
-                                                    integrator=forcespro.nlp.integrators.RK4,
-                                                    stepsize=integrator_stepsize)
-        # Indices on LHS of dynamical constraint - for efficiency reasons, make
-        # sure the matrix E has structure [0 I] where I is the identity matrix.
-        self.model.E = np.concatenate([np.zeros((4,2)), np.eye(4)], axis=1)
-
-        # Inequality constraints
-        # Simple bounds
-        #  upper/lower variable bounds lb <= z <= ub
-        #                     inputs                 |  states
-        #                     F          phi                x            y     v             theta        delta
-        # self.model.lb = np.array([-5.,  np.deg2rad(-40.),  -np.inf,   -np.inf,   -np.inf,  -np.inf, -0.38])
-        # self.model.ub = np.array([+0.5,  np.deg2rad(+40.),   np.inf,   np.inf,    np.inf,    np.inf,  0.38])
-        self.model.lb = np.array([-4.,  np.deg2rad(-25.),  -np.inf,   -np.inf,   -np.inf,  -np.inf])
-        self.model.ub = np.array([+1.5,  np.deg2rad(+25.),   np.inf,   np.inf,    4.0,    np.inf])
-        # General (differentiable) nonlinear inequalities hl <= h(z,p) <= hu
-        self.model.ineq = lambda z,p:  casadi.vertcat((z[2] -p[2]) ** 2 + (z[3] - p[3]) ** 2)
-        # Upper/lower bounds for inequalities
-        self.model.hu = np.array([+np.inf])
-        self.model.hl = np.array([1.0**2])
-        # Initial condition on vehicle states x
-        self.model.xinitidx = range(2,6) # use this to specify on which variables initial conditions
-       
+    
+    def idx2pose(self,idx):        
+        # top right is 0 - bottom left is last            
+        assert idx < self.r_size*self.c_size, "idx is out of bound"                    
+        grid_r = int(idx/(self.r_size))
+        grid_c = (idx - grid_r*self.r_size)
+        pose_x = self.map_info.pose.position.x+self.c_size/2*self.map_resolution-grid_c*self.map_resolution
+        pose_y = self.map_info.pose.position.y+self.r_size/2*self.map_resolution-grid_r*self.map_resolution
+        return [pose_x, pose_y]
         
+        
+    def pose2idx(self,pose):    
+        right_corner_x = self.map_info.pose.position.x + self.map_info.length_x/2
+        right_corner_y = self.map_info.pose.position.y + self.map_info.length_y/2
 
-    def model_build(self):
-        codeoptions = forcespro.CodeOptions('FORCESNLPsolver')
-        codeoptions.maxit = 400     # Maximum number of iterations
-        codeoptions.printlevel = 0  
-        codeoptions.optlevel = 0    # 0 no optimization, 1 optimize for size, 
-        #                             2 optimize for speed, 3 optimize for size & speed
-        # codeoptions.cleanup = False
-        codeoptions.nlp.hessian_approximation = 'bfgs'
-        # codeoptions.solvemethod = 'SQP_NLP' # choose the solver method Sequential 
-        codeoptions.nlp.bfgs_init = 3.0*np.identity(6) # initialization of the hessian
-        #                             approximation
-        codeoptions.noVariableElimination = 1.               
-        # Creates code for symbolic model formulation given above, then contacts 
-        # server to generate new solver
-        self.solver = self.model.generate_solver(options=codeoptions)
-        return self.model, self.solver
+        grid_c_idx = (int)((right_corner_x - pose[0]) / self.map_resolution)
+        grid_r_idx = (int)((right_corner_y - pose[1]) / self.map_resolution)
+        if grid_c_idx >= self.c_size:
+            return -1
+        if grid_r_idx >= self.r_size:
+            return -1
+        
+        idx = grid_c_idx + grid_r_idx*self.r_size 
+        if idx >= self.c_size*self.r_size:
+            return -1        
+         
+        return idx
+    
+    
 
-    def continuous_dynamics(self,x, u):
-        """Defines dynamics of the car, i.e. equality constraints.
-        parameters:
-        state x = [xPos,yPos,v,theta,delta]
-        input u = [F,phi]
-        """
-        # set physical constants
-        l_r = 0.45 # distance rear wheels to center of gravitiy of the car
-        l_f = 0.45 # distance front wheels to center of gravitiy of the car
-        m = 25.0   # mass of the car
+    def path_plan(self):
+# get array indices of start and goal
+        start_idx = self.pose2idx(self.start_pose)
+        goal_idx = self.pose2idx(self.goal_pose)
+        
+        # add start node to front
+        # front is a list of (total estimated cost to goal, total cost from start to node, node, previous node)
+        start_node_cost = 0
+        start_node_estimated_cost_to_goal = dist2d(self.start_pose, self.goal_pose) + start_node_cost
+        front = [(start_node_estimated_cost_to_goal, start_node_cost, start_idx, None)]
 
-        # set parameters
-        # beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(x[4]))
-        beta = casadi.arctan(l_r/(l_f + l_r) * casadi.tan(u[1]))
+        # use a dictionary to remember where we came from in order to reconstruct the path later on
+        came_from = {}
 
-        # calculate dx/dt
-        return casadi.vertcat(  x[2] * casadi.cos(x[3] + beta),  # dxPos/dt = v*cos(theta+beta)
-                                x[2] * casadi.sin(x[3] + beta),  # dyPos/dt = v*sin(theta+beta)
-                                u[0] / m,                        # dv/dt = F/m
-                                x[2]/l_r * casadi.sin(beta))#,     # dtheta/dt = v/l_r*sin(beta)
-                                # u[1])                           # ddelta/dt = phi
+        # get possible movements
+        if self.movement == '4N':
+            movements = self._get_movements_4n()
+        elif self.movement == '8N':
+            movements = self._get_movements_8n()
+        else:
+            raise ValueError('Unknown movement')
+
+        # while there are elements to investigate in our front.
+        while front:
+            # get smallest item and remove from front.
+            element = heappop(front)
+            total_cost, cost, pos_idx, previous_idx = element
+            pos = self.idx2pose(pos_idx)
+            # now it has been visited, mark with cost                        
+            if self.grid_visited[pos_idx] == 1.0:
+                continue
+            # now it has been visited, mark with cost
+            self.grid_visited[pos_idx] = 1.0            
+            # set its previous node
+            came_from[pos_idx] = previous_idx
+            
+            # if the goal has been reached, we are done!
+            if pos_idx == goal_idx:
+                break
+            
+            
+            # check all neighbors
+            for dx, dy, deltacost in movements:                
+                # determine new position
+                new_x = pos[0] + dx
+                new_y = pos[1] + dy
+                new_pos = (new_x, new_y)
+
+                # check whether new position is inside the map
+                # if not, skip node
+                new_pose_idx = self.pose2idx(new_pos)
+                if  new_pose_idx < 0:
+                    continue
+
+                # add node to front if it was not visited before 
+                if self.grid_visited[new_pose_idx] < 1.0:
+                    # traversability cost 
+                    potential_function_cost =  0.0 #self.trav_map.data[new_pose_idx]                              
+                    new_cost = cost + deltacost + potential_function_cost
+                    new_total_cost_to_goal = new_cost + dist2d(new_pos, self.goal_pose) + potential_function_cost
+
+                    heappush(front, (new_total_cost_to_goal, new_cost, new_pose_idx, pos_idx))
+
+        # reconstruct path backwards (only if we reached the goal)
+        path = []
+        path_idx = []
+        if pos_idx == goal_idx:
+            while pos_idx:
+                path_idx.append(pos_idx)
+                # transform array indices to meters
+                pos_m_x, pos_m_y = self.idx2pose(path_idx[-1])                
+                path.append((pos_m_x, pos_m_y))
+                pos_idx = came_from[pos_idx]
+
+            # reverse so that path is from start to goal.
+            path.reverse()
+            path_idx.reverse()
+
+        return path, path_idx

@@ -1,6 +1,8 @@
 import random
 
+from cv2 import LineSegmentDetector
 
+import rospy
 import os
 import math
 import json
@@ -10,7 +12,8 @@ import joblib
 import random
 import pyquaternion
 import numpy as np
-
+from visualization_msgs.msg import MarkerArray, Marker
+from geometry_msgs.msg import Point
 
 def wrap_to_pi(angle):
     """
@@ -86,3 +89,49 @@ def get_local_vel(odom, is_odom_local_frame = True):
         local_vel[1] = odom.twist.twist.linear.y
         local_vel[2] = odom.twist.twist.linear.z
     return local_vel 
+
+
+
+def dist2d(point1, point2):
+    """
+    Euclidean distance between two points
+    :param point1:
+    :param point2:
+    :return:
+    """
+
+    x1, y1 = point1[0:2]
+    x2, y2 = point2[0:2]
+
+    dist2 = (x1 - x2)**2 + (y1 - y2)**2
+
+    return math.sqrt(dist2)
+
+def create_line_strip_marker(points):
+    
+    line = Marker()
+    line.header.frame_id = "map"
+    line.header.stamp = rospy.Time.now()
+    line.type = 4
+    line.scale.x = 0.05
+    line.color.a = 1.0
+    line.color.r = 0.0
+    line.color.g = 1.0
+    line.color.b = 0.0
+    
+    for i in range(len(points)):        
+        p = Point()
+        # p.header = line.header        
+        # p.ns = "path_namespace"
+        # p.id = i
+        # p.type = 8       
+        
+        p.x = points[i][0]
+        p.y = points[i][1]
+        p.z = 0.0
+        
+        line.points.append(p)
+    
+    return line
+        
+        
