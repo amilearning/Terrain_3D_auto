@@ -11,7 +11,7 @@ class Astar:
         self.start_pose = None
         self.goal_pose = None
         self.trav_map = None
-                
+        self.traversability_weight = 10.0                
         self.grid_map = None
         self.c_size = None
         self.r_size = None
@@ -139,7 +139,7 @@ class Astar:
                 # add node to front if it was not visited before 
                 if self.grid_visited[new_pose_idx] < 1.0:
                     # traversability cost 
-                    potential_function_cost =  0.0 #self.trav_map.data[new_pose_idx]                              
+                    potential_function_cost =  (1/(self.trav_map.data[new_pose_idx]+1e-5))*self.traversability_weight                              
                     new_cost = cost + deltacost + potential_function_cost
                     new_total_cost_to_goal = new_cost + dist2d(new_pos, self.goal_pose) + potential_function_cost
 

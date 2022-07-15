@@ -70,7 +70,7 @@ class PathPlan:
         self.obs_sub = rospy.Subscriber(obs_topic, PoseWithCovarianceStamped, self.obs_callback)
         self.map_sub = rospy.Subscriber(map_topic,GridMap, self.mapCallback)
         # 20Hz planner callback 
-        self.planner_timer = rospy.Timer(rospy.Duration(1), self.planner_callback)         
+        self.planner_timer = rospy.Timer(rospy.Duration(0.1), self.planner_callback)         
         self.status_pub = rospy.Publisher(status_topic, Bool, queue_size=2)    
 
         rate = rospy.Rate(1)     
@@ -98,10 +98,13 @@ class PathPlan:
         self.Astar.set_goal(self.goal_point)
         self.Astar.set_pose(self.cur_pose)    
         self.Astar.set_map(self.trav_map, self.grid_map.info)
+        start = time.time()                 
         path, path_idx = self.Astar.path_plan()
-        print(path)
+        end = time.time()       
+        print("Planning time: {:.5f}".format( end-start))          
         path_marker = create_line_strip_marker(path)
-        self.computed_path_pub.publish(path_marker)
+        if len(path_marker.points)> 1:
+            self.computed_path_pub.publish(path_marker)
 
 
     def planner_callback(self,timer):

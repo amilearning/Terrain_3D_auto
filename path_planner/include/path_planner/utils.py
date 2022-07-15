@@ -128,7 +128,7 @@ def create_line_strip_marker(points):
         
         p.x = points[i][0]
         p.y = points[i][1]
-        p.z = 0.0
+        p.z = 5.0
         
         line.points.append(p)
     
