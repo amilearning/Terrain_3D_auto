@@ -52,15 +52,27 @@ TraversabilityMap::TraversabilityMap(ros::NodeHandle& nodeHandle)
       checkForRoughness_(false),
       checkRobotInclination_(false) {
   ROS_INFO("Traversability Map started.");
-
+  
+  
   readParameters();
   traversabilityMapPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("traversability_map", 1, true);
+  globalMapPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("global_map", 1, true);
   terrainMapPublisher_ = nodeHandle_.advertise<grid_map_msgs::GridMap>("terrain_map", 1, true);
   footprintPublisher_ = nodeHandle_.advertise<geometry_msgs::PolygonStamped>("footprint_polygon", 1, true);
   untraversablePolygonPublisher_ = nodeHandle_.advertise<geometry_msgs::PolygonStamped>("untraversable_polygon", 1, true);
 }
 
 TraversabilityMap::~TraversabilityMap() { nodeHandle_.shutdown(); }
+
+
+bool TraversabilityMap::set_global_map(){  
+ 
+  // if(a ==2 ){terrain_traversability
+  //   return false;
+  // }
+  return true;
+}
+
 
 bool TraversabilityMap::createLayers(bool useRawMap) {
   boost::recursive_mutex::scoped_lock scopedLockForElevationMap(elevationMapMutex_);
@@ -107,6 +119,9 @@ bool TraversabilityMap::readParameters() {
     ROS_WARN("Traversability Map: No footprint polygon defined.");
   }
 
+  global_map_size_ = param_io::param(nodeHandle_, "global_map_size", 100.0);
+  maxGapWidth_ = param_io::param(nodeHandle_, "max_gap_width", 0.3);
+
   mapFrameId_ = param_io::param<std::string>(nodeHandle_, "map_frame_id", "map");
   traversabilityDefaultReadAtInit_ = param_io::param(nodeHandle_, "footprint/traversability_default", 0.5);
   // Safety check
@@ -135,6 +150,7 @@ bool TraversabilityMap::readParameters() {
 }
 
 bool TraversabilityMap::setElevationMap(const grid_map_msgs::GridMap& msg) {
+
   if (getMapFrameId() != msg.info.header.frame_id) {
     ROS_ERROR("Received elevation map has frame_id = '%s', but an elevation map with frame_id = '%s' is expected.",
               msg.info.header.frame_id.c_str(), getMapFrameId().c_str());
@@ -151,6 +167,14 @@ bool TraversabilityMap::setElevationMap(const grid_map_msgs::GridMap& msg) {
     }
   }
   elevationMap_ = elevationMap;
+
+  // initial callback 
+  if(!elevationMapInitialized_){
+    grid_map::GridMap global_map({"elevation","terrain_traversability"}); 
+    global_map.setFrameId("map");
+    global_map.setGeometry(Eigen::Array2d(global_map_size_, global_map_size_), elevationMap.getResolution(), elevationMap.getPosition());
+    GlobalMap_ = global_map;
+  }
   elevationMapInitialized_ = true;
   return true;
 }
@@ -170,6 +194,18 @@ bool TraversabilityMap::setTraversabilityMap(const grid_map_msgs::GridMap& msg) 
   traversabilityMapInitialized_ = true;
   return true;
 }
+
+void TraversabilityMap::publishGlobalTraversabilityMap() {
+    grid_map_msgs::GridMap global_mapMessage;
+    boost::recursive_mutex::scoped_lock scopedLockForTraversabilityMap(traversabilityMapMutex_);
+    grid_map::GridMap global_traversabilityMapCopy = GlobalMap_;
+    scopedLockForTraversabilityMap.unlock();    
+    grid_map::GridMapRosConverter::toMessage(global_traversabilityMapCopy, global_mapMessage);
+    global_mapMessage.info.pose.position.z = zPosition_;
+    globalMapPublisher_.publish(global_mapMessage);
+}
+
+
 
 void TraversabilityMap::publishTraversabilityMap() {
   if (!traversabilityMapPublisher_.getNumSubscribers() < 1) {
@@ -283,6 +319,18 @@ bool TraversabilityMap::computeTraversability() {
   // Assign Cost according to terrain types
   //terrainMap_ = terrainMapCopy;
   terrainMap_ = terrainMapCopy;
+
+//////////////////////////////// update global map //////////////////////////////// 
+for (grid_map::GridMapIterator it(terrainMapCopy); !it.isPastEnd(); ++it) {
+      grid_map::Position position;
+      terrainMapCopy.getPosition(*it, position);
+      if (GlobalMap_.isInside(position)){
+          GlobalMap_.atPosition("elevation", position) = terrainMapCopy.at("elevation", *it);
+          GlobalMap_.atPosition("terrain_traversability", position) = terrainMapCopy.at("terrain_traversability", *it);
+      }      
+    } 
+//////////////////////////////////////////////////////////////////////////////////////////// 
+
   scopedLockForTerrainMap.unlock();
 
   publishTraversabilityMap();
@@ -1319,7 +1367,7 @@ void TraversabilityMap::drawPoints(const std::vector<cv::Point2d> GridPosPixel_v
   for(cv::Point2d uv : GridPosPixel_vector){
     cv::circle(image, uv, 3, CV_RGB(255,255,255), -1);
   }
-  cv::imwrite("/home/hojin/research/traver_ws/test/test-rellis.jpg", image);
+  cv::imwrite("/home/hjpc/research/offroad_ws/test/test-rellis.jpg", image);
 }
 
 }  // namespace traversability_estimation

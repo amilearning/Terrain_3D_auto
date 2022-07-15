@@ -37,7 +37,8 @@ TraversabilityEstimation::TraversabilityEstimation(ros::NodeHandle& nodeHandle)
   submapClient_ = nodeHandle_.serviceClient<grid_map_msgs::GetGridMap>(submapServiceName_);
 
   if (!updateDuration_.isZero()) {
-    updateTimer_ = nodeHandle_.createTimer(updateDuration_, &TraversabilityEstimation::updateTimerCallback, this);
+    updateTimer_ = nodeHandle_.createTimer(updateDuration_, &TraversabilityEstimation::updateTimerCallback, this);    
+    globalupdateTimer_ = nodeHandle_.createTimer(globalmap_updateDuration_, &TraversabilityEstimation::globalmapupdateTimerCallback, this);
   } else {
     ROS_WARN("Update rate is zero. No traversability map will be published.");
   }
@@ -89,6 +90,7 @@ bool TraversabilityEstimation::readParameters() {
   } else {
     updateDuration_.fromSec(0.0);
   }
+  globalmap_updateDuration_.fromSec(1.0);
   // Read parameters for image subscriber.
   imageTopic_ = param_io::param<std::string>(nodeHandle_, "image_topic", "/image_elevation");
   imageResolution_ = param_io::param(nodeHandle_, "resolution", 0.03);
@@ -158,7 +160,7 @@ void TraversabilityEstimation::imageCB(const sensor_msgs::ImageConstPtr& image_m
   traversabilityMap_.getSemanticMask_MSG(image_msg);
 }
 
-
+void TraversabilityEstimation::globalmapupdateTimerCallback(const ros::TimerEvent& timerEvent) { traversabilityMap_.publishGlobalTraversabilityMap(); }
 void TraversabilityEstimation::updateTimerCallback(const ros::TimerEvent& timerEvent) { updateTraversability(); }
 
 bool TraversabilityEstimation::updateServiceCallback(grid_map_msgs::GetGridMapInfo::Request&,
@@ -194,7 +196,7 @@ bool TraversabilityEstimation::updateServiceCallback(grid_map_msgs::GetGridMapIn
 bool TraversabilityEstimation::updateTraversability() {
   grid_map_msgs::GridMap elevationMap;
   if (!getImageCallback_) {
-    ROS_DEBUG("Sending request to %s.", submapServiceName_.c_str());
+    ROS_DEBUG("(image callback)Sending request to %s.", submapServiceName_.c_str());
     if (!submapClient_.waitForExistence(ros::Duration(2.0))) {
       return false;
     }
@@ -208,7 +210,7 @@ bool TraversabilityEstimation::updateTraversability() {
     }
   } else {
     //if (!traversabilityMap_.computeTraversability()) return false;
-    ROS_DEBUG("Sending request to %s.", submapServiceName_.c_str());
+    ROS_DEBUG("(trav)Sending request to %s.", submapServiceName_.c_str());
     if (requestElevationMap(elevationMap)) {
       traversabilityMap_.setElevationMap(elevationMap);
       if (!traversabilityMap_.computeTraversability()) return false;

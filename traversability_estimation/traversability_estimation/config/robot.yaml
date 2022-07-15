@@ -13,5 +13,6 @@ grid_map_to_initialize_traversability_map:
   enable: true
   grid_map_topic_name: /elevation_mapping/elevation_map
 image_topic: /left_camera/image_raw
+global_map_size: 50.0
 # image_topic: /erfnet_ros/semantic_mask
 #image_topic: /pylon_camera_node/image_rect_color

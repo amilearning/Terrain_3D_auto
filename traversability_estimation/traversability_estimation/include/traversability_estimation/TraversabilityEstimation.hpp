@@ -150,6 +150,8 @@ class TraversabilityEstimation {
    */
   void updateTimerCallback(const ros::TimerEvent& timerEvent);
 
+  void globalmapupdateTimerCallback(const ros::TimerEvent& timerEvent);
+
   /*!
    * Gets the grid map for the desired submap center point.
    * @param[out] map the map that is received.
@@ -218,8 +220,11 @@ class TraversabilityEstimation {
   //! Timer for the map update.
   ros::Timer updateTimer_;
 
+  ros::Timer globalupdateTimer_;
+
   //! Duration between map updates.
   ros::Duration updateDuration_;
+  ros::Duration globalmap_updateDuration_;
 
   //! Requested elevation map layers.
   std::vector<std::string> elevationMapLayers_;

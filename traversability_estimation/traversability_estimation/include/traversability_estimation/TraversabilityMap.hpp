@@ -106,6 +106,14 @@ class TraversabilityMap {
    */
   bool setTraversabilityMap(const grid_map_msgs::GridMap& msg);
 
+  
+/*!
+   * Set the global traversability map.
+   * @param[in] msg grid map with the layers of a traversability map.
+   * @return true if successful.
+   */
+  bool set_global_map();
+
   /*!
    * Set the elevation map from layers of a grid_map_msgs::GridMap.
    * @param[in] msg grid map with a layer 'elevation'.
@@ -168,6 +176,8 @@ class TraversabilityMap {
    * Publishes the latest traversability map.
    */
   void publishTraversabilityMap();
+
+  void publishGlobalTraversabilityMap();
 
   /*!
    * Publishes the latest terrain map.
@@ -414,6 +424,8 @@ class TraversabilityMap {
 
   //! Publisher of the traversability map.
   ros::Publisher traversabilityMapPublisher_;
+  //  Publishe of the global traversability map 
+  ros::Publisher globalMapPublisher_;
 
   //! Publisher of the terrain map.
   ros::Publisher terrainMapPublisher_;
@@ -431,6 +443,9 @@ class TraversabilityMap {
   double maxGapWidth_;
   double circularFootprintOffset_;  // TODO: get this with FootprintPath msg.
   double criticalStepHeight_;
+
+  //! global map info 
+  double global_map_size_;
 
   //! Default value for traversability of unknown regions.
   double traversabilityDefault_;
@@ -454,8 +469,11 @@ class TraversabilityMap {
 
   //! Traversability map.
   grid_map::GridMap traversabilityMap_;
+  grid_map::GridMap GlobalMap_;
   std::vector<std::string> traversabilityMapLayers_;
   bool traversabilityMapInitialized_;
+
+
 
   //! Elevation map.
   grid_map::GridMap elevationMap_;
