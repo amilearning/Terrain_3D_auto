@@ -13,20 +13,20 @@ pkg_dir = rospack.get_path('mpc_gp')
 
 
 class GPMPCModel:
-    def __init__(self,gpmodel = None, model_build = False, N = 20, dt = 0.05, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False):
+    def __init__(self, model_build = False, N = 20, dt = 0.05, Q = None, R = None, solver_name = "MPCGPSOLVER", point_reference=False,gpmodel = None):
         self.gpmodel = gpmodel
+        if self.gpmodel is not None:            
+            self.vxgp, self.vygp, self.omegagp = self.gpmodel.get_casadi_gps()
+            self.xscale = self.gpmodel.vx_xscalar
+            self.xss = self.xscale.scale_
+            self.xsm = self.xscale.mean_
         solver_dir = "/home/hjpc/.ros/FORCESNLPsolver"
         self.N = N
         self.dt = dt
         self.lr = 0.23
         self.lf = 0.34
         self.mass = 25.0
-        self.vxgp, self.vygp, self.omegagp = self.gpmodel.get_casadi_gps()
-        self.xscale = self.gpmodel.vx_xscalar
-        self.xss = self.xscale.scale_
-        self.xsm = self.xscale.mean_
-        # self.yscale = self.gpmodel.vx_yscalar
-
+  
         try:
             # solver_dir = pkg_dir+"/FORCESNLPsolver"
             self.load_model()
@@ -152,20 +152,23 @@ class GPMPCModel:
         # calculate dx/dt
 
         # gp_input = np.array([[1,2,3,4,5,6]])
+        if self.gpmodel is not None:            
+            gpinput = (casadi.vertcat(u[0],u[1],x[3],x[4],x[5],x[6]).T - self.xsm.reshape(1,-1)) / self.xss.reshape(1,-1)
         
-        gpinput = (casadi.vertcat(u[0],u[1],x[3],x[4],x[5],x[6]).T - self.xsm.reshape(1,-1)) / self.xss.reshape(1,-1)*100.0
-        
-        # error_vx,error_vy, error_omega = self.eval_gp(gp_input)
+            dxdt = casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),  # x
+                                x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),  # y 
+                                x[5],                                         # psi       
+                                u[0]+self.vxgp(gpinput)[0],                                         # vx 
+                                (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0])+self.vygp(gpinput)[0],        # vy  
+                                (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0])+self.omegagp(gpinput)[0],        # omega                   
+                                u[1])                           # ddelta/dt = phi
+        else:
+            dxdt = casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),  # x
+                                x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),  # y 
+                                x[5],                                         # psi       
+                                u[0],                                         # vx 
+                                (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0]),        # vy  
+                                (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0]),        # omega                   
+                                u[1])                       
 
-        return casadi.vertcat(x[3]*casadi.cos(x[2])-x[4]*casadi.sin(x[2]),  # x
-                              x[3]*casadi.sin(x[2])+x[4]*casadi.cos(x[2]),  # y 
-                              x[5],                                         # psi       
-                              u[0]+self.vxgp(gpinput)[0],                                         # vx 
-                              (l_r/(l_f+l_r))*(u[1]*x[3]+x[6]*u[0])+self.vygp(gpinput)[0],        # vy  
-                              (1.0/(l_r+l_f))*(u[1]*x[3]+x[6]*u[0])+self.omegagp(gpinput)[0],        # omega                   
-                              u[1])                           # ddelta/dt = phi
-
-                            # x[2] * casadi.cos(x[3] + beta),  # dxPos/dt = v*cos(theta+beta)
-                            #     x[2] * casadi.sin(x[3] + beta),  # dyPos/dt = v*sin(theta+beta)
-                            #     u[0],                        # dv/dt = F/m
-                            #     x[2]/l_r * casadi.sin(beta),     # dtheta/dt = v/l_r*sin(beta)
+        return dxdt

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(traj_generator)
+project(path_planner)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   autorally_msgs
+  grid_map_msgs  
 )
 
 ## System dependencies are found with CMake's conventions

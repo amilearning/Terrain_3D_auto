@@ -15,8 +15,8 @@ import gpytorch
 from gpytorch.mlls import SumMarginalLogLikelihood
 import matplotlib.pyplot as plt
 import time
-from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('runs/gp')
+# from torch.utils.tensorboard import SummaryWriter
+# writer = SummaryWriter('runs/gp')
 
 rospack = rospkg.RosPack()
 # pkg_dir = rospack.get_path('mpc_gp')
@@ -106,7 +106,7 @@ class GPModel:
             loss = -mll(output, self.y_train)
             loss.backward()
             print('Iter %d/%d - Loss: %.3f' % (i + 1, self.training_iterations, loss.item()))
-            writer.add_scalar('training loss', loss.item(), i)                        
+            # writer.add_scalar('training loss', loss.item(), i)                        
             optimizer.step()
             step_lr_scheduler.step()
             loss_set.append(loss.item())

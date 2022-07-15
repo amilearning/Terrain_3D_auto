@@ -15,7 +15,7 @@ import gpytorch
 from gpytorch.mlls import SumMarginalLogLikelihood
 import matplotlib.pyplot as plt
 import time
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 import _pickle as pickle 
 from sklearn.preprocessing import StandardScaler
@@ -117,11 +117,11 @@ def loadGPModel(name, model, xscaler, yscaler, kernel='RBF'):
 
 
 class GPModel:
-    def __init__(self,dt = 0.05, data_file_name = "test_data.npz", model_file_name = "GP_.pth"):
+    def __init__(self,dt = 0.05, data_file_name = "test_data.npz"):
+        max_data_length = 800
         self.SAVE_MODELS = True
         self.dt = dt
         data_dir = pkg_dir+"/data/"+data_file_name
-        self.model_file_name = model_file_name                
         data = np.load(data_dir)
         xstate = data['xstate']
         xpredState = data['xpredState']
@@ -130,7 +130,8 @@ class GPModel:
         pred_states = xpredState[0:-1,[5,6,7]]
         true_states = xstate[1:,[5,6,7]]
         self.err_states = true_states - pred_states 
-        self.X_train = np.empty([len(self.err_states[:,0]), 6])                
+        self.err_states = self.err_states[:max_data_length,:]        
+        self.X_train = np.empty([len(self.err_states[:max_data_length,0]), 6])                
         for i in range(len(self.err_states[:,0])):            
             self.X_train[i,:] = xstate[i,[0,1,5,6,7,8]]
         
@@ -206,6 +207,23 @@ class GPModel:
         omegagp = loadGPModel('omega', self.omega_model, self.omega_xscalar, self.omega_yscalar)
         return vxgp,vygp,omegagp
 
+    def gp_eval(self):
+        y_train = self.err_states[:,0].reshape(-1,1)  
+        y_train_mu, y_train_std = self.vx_model.predict(self.X_train, return_std=True)
+
+        y_train = self.vx_yscalar.inverse_transform(y_train)
+        y_train_mu = self.vx_yscalar.inverse_transform(y_train_mu)
+        y_train_std *= self.vx_yscalar.scale_
+
+        MSE = mean_squared_error(y_train, y_train_mu, multioutput='raw_values')
+        R2Score = r2_score(y_train, y_train_mu, multioutput='raw_values')
+        EV = explained_variance_score(y_train, y_train_mu, multioutput='raw_values')
+
+        print('root mean square error: %s' %(np.sqrt(MSE)))
+        print('normalized mean square error: %s' %(np.sqrt(MSE)/np.array(np.abs(y_train.mean()))))
+        print('R2 score: %s' %(R2Score))
+        print('explained variance: %s' %(EV))
+
     def draw_output(self,y_predicted_mean,lower,upper,ground_truth= None):
         with torch.no_grad():
             Xaxis = np.linspace(0,0.05*len(y_predicted_mean[:,0]),len(y_predicted_mean[:,0]))
@@ -235,5 +253,7 @@ class GPModel:
                 
             plt.show()
   
-
+gpmodel = GPModel()
+gpmodel.all_model_build_and_save()
+gpmodel.gp_eval()
 # gpmodel.gp_eval(gpmodel.X_train)

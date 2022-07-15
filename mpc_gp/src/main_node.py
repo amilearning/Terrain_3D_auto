@@ -48,10 +48,10 @@ class GPMPCWrapper:
         
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
-        self.mpc_model_build_flag = rospy.get_param('~mpc_build_flat', default=True)             
-        self.GP_build_flag = rospy.get_param('~gp_build_flat', default=True)   
-        self.gp_train_data_file = rospy.get_param('~gp_train_data_file', default="test_data.npz")   
-        self.gp_model_file = rospy.get_param('~gp_model_file', default="GP_.pth")   
+        self.gp_enable = rospy.get_param('~gp_enable', default=False)     
+        self.mpc_model_build_flag = rospy.get_param('~mpc_build_flat', default=False)             
+        self.GP_build_flag = rospy.get_param('~gp_build_flat', default=False)   
+        self.gp_train_data_file = rospy.get_param('~gp_train_data_file', default="test_data.npz")             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0
          #   x[0]x(2), x[1]y(3), x[2]psi(4), x[3]vx(5), x[4]vy(6), x[5]omega(7), x[6]delta(8)
         self.cur_x = np.transpose(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
@@ -59,14 +59,18 @@ class GPMPCWrapper:
         # Initialize GP         
 #################################################################
         ##############################################
-        self.GPmodel = GPModel()                
-        if self.GP_build_flag:
-            self.GPmodel.all_model_build_and_save()            
-        else:
-            self.GPmodel.all_model_load()
+        if self.gp_enable:
+            self.GPmodel = GPModel(data_file_name = self.gp_train_data_file)                
+            if self.GP_build_flag:
+                self.GPmodel.all_model_build_and_save()            
+            else:
+                self.GPmodel.all_model_load()
         ##################################################################
-        self.MPCModel = GPMPCModel(gpmodel = self.GPmodel, model_build = self.mpc_model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
-        self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)                    
+            self.MPCModel = GPMPCModel(model_build = self.mpc_model_build_flag,  N = self.n_mpc_nodes, dt = self.dt,gpmodel = self.GPmodel)
+        else:
+            self.MPCModel = GPMPCModel(model_build = self.mpc_model_build_flag,  N = self.n_mpc_nodes, dt = self.dt)
+        self.TrajManager = TrajManager(MPCModel = self.MPCModel, dt = self.dt, n_sample = self.n_mpc_nodes)         
+        self.traj_sampler_delta_sign = 1.0
         self.dataloader = DataLoader(input_dim = 2, state_dim = len(self.cur_x) )
         
         self.odom_available   = False 
@@ -111,7 +115,7 @@ class GPMPCWrapper:
         self.traj_random_count = 0
         self.local_traj = None
         self.sample_delta  = 0.0
-        self.sample_velocity = 1.0
+        self.sample_velocity = 1.5
         # 20Hz control callback 
         self.cmd_timer = rospy.Timer(rospy.Duration(0.05), self.cmd_callback) 
         self.blend_min = 3
@@ -167,14 +171,17 @@ class GPMPCWrapper:
         if self.init_traj:
             self.TrajManager.setState(self.cur_x)
             self.init_traj = False
-        path_duration = 2.5 # sec 
+        path_duration = 2.0 # sec 
+        
         if self.traj_random_count > path_duration/self.traj_dt:
             self.traj_random_count = 0
             self.TrajManager.setState(self.cur_x)
-            self.sample_delta    = self.sample_delta + (np.random.rand(1)[0]-0.5)*0.025
+            self.sample_delta    = self.sample_delta +0.5*np.pi/180.0*self.traj_sampler_delta_sign
+            if abs(self.sample_delta) >= 12*np.pi/180.0:
+                    self.traj_sampler_delta_sign = -1*self.traj_sampler_delta_sign            
             self.sample_delta = max(min(self.sample_delta,25*np.pi/180.0),-25*np.pi/180)
-            self.sample_velocity = self.sample_velocity + (np.random.rand(1)[0]-0.5)*0.2
-            self.sample_velocity = max(min(self.sample_velocity,0.0),1.5)
+            self.sample_velocity = self.sample_velocity + (np.random.rand(1)[0]-0.5)*0.1
+            self.sample_velocity = max(min(self.sample_velocity,0,5),2.0)
 
         self.ref_state = self.TrajManager.gen_traj(self.sample_delta, self.sample_velocity)        
         marker_refs = traj_to_markerArray(self.ref_state)        

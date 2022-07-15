@@ -25,7 +25,7 @@ class TrajManager:
         trajs= np.empty((0,len(self.xstate)))
         trajs = np.append(trajs,[self.xstate],axis=0)        
         # cum_dist = 0.0        
-        for i in range(self.n_sample*8):
+        for i in range(self.n_sample*4):
             tmp_state = np.copy(trajs[-1,:]) 
             beta = math.atan(self.MPCModel.lr/(self.MPCModel.lf + self.MPCModel.lr) * math.tan(delta))
             tmp_state[0] = trajs[-1,0] + self.dt*velocity*math.cos(tmp_state[2]+beta)
