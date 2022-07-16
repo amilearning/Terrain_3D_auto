@@ -11,6 +11,7 @@ class Astar:
         self.start_pose = None
         self.goal_pose = None
         self.trav_map = None
+        self.elev_map = None
         self.traversability_weight = 10.0                
         self.grid_map = None
         self.c_size = None
@@ -18,10 +19,25 @@ class Astar:
         self.map_resolution = None
         self.movement = '8N'
         self.grid_visited = None
+        self.path_computing = False
+        
+        
 
-    def set_map(self,map, map_info):
-        self.trav_map = map
-        self.trav_map.data = np.where(np.isnan(self.trav_map.data),0,self.trav_map.data)
+    def is_path_computing(self):
+        return self.path_computing    
+
+    def set_map(self,map, map_info, elev_map):
+        self.trav_map = map        
+        self.trav_map_list = np.array(list(self.trav_map.data))      
+        trav_nan_mask = np.isnan(self.trav_map_list)
+        self.trav_map_list[trav_nan_mask] = np.interp(np.flatnonzero(trav_nan_mask), np.flatnonzero(~trav_nan_mask), self.trav_map_list[~trav_nan_mask])
+        self.trav_map.data = tuple(self.trav_map_list)
+
+        self.elev_map = elev_map
+        self.elev_map_list = np.array(list(self.elev_map.data))     
+        elev_nan_mask = np.isnan(self.elev_map_list)
+        self.elev_map_list[elev_nan_mask] = np.interp(np.flatnonzero(elev_nan_mask), np.flatnonzero(~elev_nan_mask), self.elev_map_list[~elev_nan_mask])
+        
         self.grid_visited = np.zeros([len(self.trav_map.data)])
         self.c_size  = self.trav_map.layout.dim[0].size
         self.r_size  = self.trav_map.layout.dim[1].size
@@ -83,6 +99,7 @@ class Astar:
     
 
     def path_plan(self):
+        
 # get array indices of start and goal
         start_idx = self.pose2idx(self.start_pose)
         goal_idx = self.pose2idx(self.goal_pose)
@@ -159,5 +176,15 @@ class Astar:
             # reverse so that path is from start to goal.
             path.reverse()
             path_idx.reverse()
+        
+        path3d = self.get_z_value_from_path(path)
+        return path3d
 
-        return path
+    def get_z_value_from_path(self,path):
+        path3d = []
+        for i in range(len(path)):
+            pose_tmp = (path[i][0], path[i][1])
+            new_pose_idx = self.pose2idx(pose_tmp)
+            z_tmp = self.elev_map.data[new_pose_idx]
+            path3d.append((path[i][0],path[i][1],z_tmp))        
+        return path3d

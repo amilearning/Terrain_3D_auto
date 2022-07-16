@@ -30,6 +30,7 @@ from grid_map_msgs.msg import GridMap
 from path_planner.utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, wrap_to_pi, create_line_strip_marker, create_arrow_markers
 from path_planner.astar import Astar
 from path_planner.hybrid_astar import HybridAstar
+from path_planner.hybrid_gp_astar import HybridGPAstar
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -46,7 +47,10 @@ class PathPlan:
             self.computed_path_pub = rospy.Publisher("/astar_path", Marker, queue_size=2)             
         elif self.planner_type == "hybrid_astar":
             self.planner = HybridAstar()
-            self.computed_path_pub_markerarray = rospy.Publisher("/astar_path", MarkerArray, queue_size=2)                               
+            self.computed_path_pub_markerarray = rospy.Publisher("/hybrid_astar_path", MarkerArray, queue_size=2)                               
+        elif self.planner_type == "hybrid_gp_astar":
+            self.planner = HybridGPAstar()
+            self.computed_path_pub_markerarray = rospy.Publisher("/hybrid_gp_astar__path", MarkerArray, queue_size=2)                               
         else:
             rospy.logerr("unkown planner")
             return 
@@ -69,6 +73,7 @@ class PathPlan:
         map_topic = "/traversability_estimation/global_map"        
         status_topic = "/planner_status"
         self.layer_name = "terrain_traversability"
+        self.elevation_layer_name = "elevation"
 
         # Publishers        
         
@@ -106,20 +111,20 @@ class PathPlan:
         
 
     def run_planning(self):
+        
         self.planner.set_goal(self.goal_point)
         self.planner.set_pose(self.cur_pose)    
-        self.planner.set_map(self.trav_map, self.grid_map.info)
+        self.planner.set_map(self.trav_map, self.grid_map.info, self.elev_map)
         start = time.time()                 
         path = self.planner.path_plan()
         end = time.time()       
         print("Planning time: {:.5f}".format( end-start))          
-        if self.planner_type == "astar":
-            path_marker = create_line_strip_marker(path)
-            if len(path_marker.points)> 1:
+        if len(path)> 0:
+            if self.planner_type == "astar":                
+                path_marker = create_line_strip_marker(path)                
                 self.computed_path_pub.publish(path_marker)
-        else:
-            path_markerArray = create_arrow_markers(path)
-            if len(path_markerArray.markers)> 1:
+            else:                
+                path_markerArray = create_arrow_markers(path)            
                 self.computed_path_pub_markerarray.publish(path_markerArray)
 
 
@@ -132,6 +137,7 @@ class PathPlan:
             rospy.loginfo("Waypoints are not available yet")
             return
         
+
         def _thread_func():
             self.run_planning()            
         self.planner_thread = threading.Thread(target=_thread_func(), args=(), daemon=True)
@@ -149,12 +155,15 @@ class PathPlan:
     def mapCallback(self,msg):        
         self.grid_map = msg    
         traversability_idx = self.grid_map.layers.index(self.layer_name)            
+        elevation_idx = self.grid_map.layers.index(self.elevation_layer_name)            
+        self.elev_map = self.grid_map.data[elevation_idx]        
         self.trav_map = self.grid_map.data[traversability_idx]        
      
 ###################################################################################
 
 def main():
     rospy.init_node("path_plan")
+# astar, hybrid_astar, hybrid_gp_astar
     planner_type = rospy.get_param('~planner', default='astar')
     PathPlan(planner_type)
   

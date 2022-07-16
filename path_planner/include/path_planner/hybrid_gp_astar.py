@@ -10,7 +10,7 @@ from path_planner.astar import Astar
 from path_planner.utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, wrap_to_pi, get_pose_euler
 from path_planner.utils import get_discretized_thetas, round_theta
 
-class HybridAstar(Astar):
+class HybridGPAstar(Astar):
     def __init__(self):
         super().__init__()         
         self.l_r = 0.45
@@ -124,7 +124,7 @@ class HybridAstar(Astar):
                     if node==start:
                         rev_final_path.append(start)
                         break
-                
+                    
                 rev_final_path.pop()
                 rev_final_path.pop()
                 rev_final_path.append(self.start_pose)
@@ -133,7 +133,7 @@ class HybridAstar(Astar):
                 rev_final_path.append(self.goal_pose)
                 final_path = []
                 for p in rev_final_path:
-                    final_path.append(p)                
+                    final_path.append(p)  
                 final_path = self.get_z_value_from_path(final_path)
                 return final_path
             

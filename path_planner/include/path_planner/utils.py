@@ -14,6 +14,7 @@ import pyquaternion
 import numpy as np
 from visualization_msgs.msg import MarkerArray, Marker
 from geometry_msgs.msg import Point
+from hmcl_msgs.msg import Waypoint, Lane
 
 def wrap_to_pi(angle):
     """
@@ -132,7 +133,7 @@ def create_line_strip_marker(points):
         
         p.x = points[i][0]
         p.y = points[i][1]
-        p.z = 5.0
+        p.z = points[i][2]+0.1
         
         line.points.append(p)
     
@@ -168,17 +169,17 @@ def create_arrow_markers(points):
 
     for i in range(len(points)):        
         arrow = Marker()        
-        qat = euler_to_quaternion(0.0,0.0,points[i][2])
+        qat = euler_to_quaternion(0.0,0.0,points[i][3])
         arrow.pose.position.x = points[i][0]
         arrow.pose.position.y = points[i][1]
+        arrow.pose.position.z = points[i][2]+0.1
         arrow.id = i
-        arrow.ns = "arrow"
-        arrow.pose.position.z = 5.0
+        arrow.ns = "arrow"        
         arrow.pose.orientation.x = qat[1] 
         arrow.pose.orientation.y = qat[2]
         arrow.pose.orientation.z = qat[3]
         arrow.pose.orientation.w = qat[0]
-
+        arrow.lifetime = rospy.Duration(5.0)
         arrow.header.frame_id = "map"
         arrow.header.stamp = rospy.Time.now()
         arrow.type = 0
@@ -192,3 +193,57 @@ def create_arrow_markers(points):
         markers.markers.append(arrow)
     
     return markers
+
+def path_to_traj(path,resolution):
+    assert resolution > 0
+    traj = Lane()
+    traj.header.stamp = rospy.Time.now()
+    if len(path) > 1:
+        x_array = []
+        y_array = []
+        z_array = []
+        yaw_array = []
+        for i in range(len(path)-1):
+            dist3D = math.sqrt((path[i][0]-path[i+1][0])**2+(path[i][1]-path[i+1][1])**2+(path[i][2]-path[i+1][2])**2) 
+            numbin = int(dist3D/resolution)
+            xp = [0,1]
+            x_fp = [path[i][0], path[i+1][0]]
+            y_fp = [path[i][1], path[i+1][1]]
+            z_fp = [path[i][2], path[i+1][2]]
+            yaw_fp = [path[i][3], path[i+1][3]]
+            axis = np.linspace(0,1-1/numbin,numbin)
+            x_data = np.interp(axis,xp,x_fp)
+            y_data = np.interp(axis,xp,y_fp)
+            z_data = np.interp(axis,xp,z_fp)            
+            yaw_data = np.interp(axis,xp,yaw_fp)
+            x_array.append(x_data)
+            y_array.append(y_data)
+            z_array.append(z_data)
+            yaw_array.append(yaw_data)
+            
+        x_array = np.array(x_array).reshape([1,-1])[0]
+        y_array = np.array(y_array).reshape([1,-1])[0]
+        z_array = np.array(z_array).reshape([1,-1])[0]
+        yaw_array = np.array(yaw_array).reshape([1,-1])[0]
+
+        for j in range(len(x_array)):
+            waypoint_tmp = Waypoint()
+            waypoint_tmp.pose.pose.position.x = x_array[j]
+            waypoint_tmp.pose.pose.position.y = y_array[j]
+            waypoint_tmp.pose.pose.position.z = z_array[j]
+            quat_tmp = euler_to_quaternion(0.0, 0.0, yaw_array[j])
+            waypoint_tmp.pose.pose.orientation.w = quat_tmp[0]
+            waypoint_tmp.pose.pose.orientation.x = quat_tmp[1]
+            waypoint_tmp.pose.pose.orientation.y = quat_tmp[2]
+            waypoint_tmp.pose.pose.orientation.z = quat_tmp[3]
+            traj.waypoints.append(waypoint_tmp)
+        
+    return traj
+    
+
+
+
+            
+
+
+    
