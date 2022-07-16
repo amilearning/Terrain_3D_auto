@@ -27,7 +27,7 @@ from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from visualization_msgs.msg import MarkerArray, Marker
 # from hmcl_msgs import Lane
 from grid_map_msgs.msg import GridMap
-from path_planner.utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, wrap_to_pi, create_line_strip_marker
+from path_planner.utils import euler_to_quaternion, quaternion_to_euler, unit_quat, get_odom_euler, get_local_vel, wrap_to_pi, create_line_strip_marker, create_arrow_markers
 from path_planner.astar import Astar
 from path_planner.hybrid_astar import HybridAstar
 from mpl_toolkits.mplot3d import Axes3D
@@ -40,10 +40,13 @@ def clamp(n, minn, maxn):
 
 class PathPlan:
     def __init__(self,planner="astar"):
-        if planner == "astar":
+        self.planner_type = planner
+        if self.planner_type == "astar":
             self.planner = Astar()
-        elif planner == "hybrid_astar":
+            self.computed_path_pub = rospy.Publisher("/astar_path", Marker, queue_size=2)             
+        elif self.planner_type == "hybrid_astar":
             self.planner = HybridAstar()
+            self.computed_path_pub_markerarray = rospy.Publisher("/astar_path", MarkerArray, queue_size=2)                               
         else:
             rospy.logerr("unkown planner")
             return 
@@ -68,7 +71,8 @@ class PathPlan:
         self.layer_name = "terrain_traversability"
 
         # Publishers        
-        self.computed_path_pub = rospy.Publisher("/astar_path", Marker, queue_size=2)                
+        
+        
         self.debug_pub = rospy.Publisher("mpc_debug", PoseStamped, queue_size=2)    
         
         # Subscribers
@@ -98,7 +102,7 @@ class PathPlan:
         if self.waypoint_available is False:
             self.waypoint_available = True
         
-        self.goal_point = [msg.pose.position.x, msg.pose.position.y]
+        self.goal_point = msg
         
 
     def run_planning(self):
@@ -106,12 +110,17 @@ class PathPlan:
         self.planner.set_pose(self.cur_pose)    
         self.planner.set_map(self.trav_map, self.grid_map.info)
         start = time.time()                 
-        path, path_idx = self.planner.path_plan()
+        path = self.planner.path_plan()
         end = time.time()       
         print("Planning time: {:.5f}".format( end-start))          
-        path_marker = create_line_strip_marker(path)
-        if len(path_marker.points)> 1:
-            self.computed_path_pub.publish(path_marker)
+        if self.planner_type == "astar":
+            path_marker = create_line_strip_marker(path)
+            if len(path_marker.points)> 1:
+                self.computed_path_pub.publish(path_marker)
+        else:
+            path_markerArray = create_arrow_markers(path)
+            if len(path_markerArray.markers)> 1:
+                self.computed_path_pub_markerarray.publish(path_markerArray)
 
 
     def planner_callback(self,timer):
@@ -133,7 +142,8 @@ class PathPlan:
     def odom_callback(self, msg):        
         if self.odom_available is False:
             self.odom_available = True         
-        self.cur_pose = [msg.pose.pose.position.x, msg.pose.pose.position.y]
+        
+        self.cur_pose = msg
         
         
     def mapCallback(self,msg):        

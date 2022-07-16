@@ -253,7 +253,7 @@ class GPModel:
                 
             plt.show()
   
-gpmodel = GPModel()
-gpmodel.all_model_build_and_save()
-gpmodel.gp_eval()
+# gpmodel = GPModel()
+# gpmodel.all_model_build_and_save()
+# gpmodel.gp_eval()
 # gpmodel.gp_eval(gpmodel.X_train)

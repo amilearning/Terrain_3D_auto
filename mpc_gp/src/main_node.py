@@ -49,7 +49,7 @@ class GPMPCWrapper:
         self.n_mpc_nodes = rospy.get_param('~n_nodes', default=40)
         self.t_horizon = rospy.get_param('~t_horizon', default=2.0)   
         self.gp_enable = rospy.get_param('~gp_enable', default=False)     
-        self.mpc_model_build_flag = rospy.get_param('~mpc_build_flat', default=False)             
+        self.mpc_model_build_flag = rospy.get_param('~mpc_build_flat', default=True)             
         self.GP_build_flag = rospy.get_param('~gp_build_flat', default=False)   
         self.gp_train_data_file = rospy.get_param('~gp_train_data_file', default="test_data.npz")             
         self.dt = self.t_horizon / self.n_mpc_nodes*1.0

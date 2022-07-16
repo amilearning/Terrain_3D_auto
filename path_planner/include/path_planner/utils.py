@@ -38,6 +38,10 @@ def euler_to_quaternion(roll, pitch, yaw):
     return np.array([qw, qx, qy, qz])
 
 
+def get_pose_euler(pose):
+    q = pyquaternion.Quaternion(w=pose.orientation.w, x=pose.orientation.x, y=pose.orientation.y, z=pose.orientation.z)
+    yaw, pitch, roll = q.yaw_pitch_roll
+    return [roll, pitch, yaw]
 
 def get_odom_euler(odom):    
     q = pyquaternion.Quaternion(w=odom.pose.pose.orientation.w, x=odom.pose.pose.orientation.x, y=odom.pose.pose.orientation.y, z=odom.pose.pose.orientation.z)
@@ -135,3 +139,56 @@ def create_line_strip_marker(points):
     return line
         
         
+def round_theta(theta, thetas):
+    """ Round theta to closest discretized value. """
+
+    return min(thetas, key=lambda x: abs(x-theta) % (2*np.pi))
+
+def get_discretized_thetas(unit_theta):
+    """ Get all discretized theta values by unit value. """
+
+    thetas = [-np.pi+1e-2]
+
+    while True:
+        
+        theta = thetas[-1] + unit_theta
+        
+        # if theta > (np.pi - unit_theta):
+        if theta > (np.pi):
+            break
+        
+        thetas.append(theta)
+    
+    return thetas
+
+
+
+def create_arrow_markers(points):
+    markers = MarkerArray()
+
+    for i in range(len(points)):        
+        arrow = Marker()        
+        qat = euler_to_quaternion(0.0,0.0,points[i][2])
+        arrow.pose.position.x = points[i][0]
+        arrow.pose.position.y = points[i][1]
+        arrow.id = i
+        arrow.ns = "arrow"
+        arrow.pose.position.z = 5.0
+        arrow.pose.orientation.x = qat[1] 
+        arrow.pose.orientation.y = qat[2]
+        arrow.pose.orientation.z = qat[3]
+        arrow.pose.orientation.w = qat[0]
+
+        arrow.header.frame_id = "map"
+        arrow.header.stamp = rospy.Time.now()
+        arrow.type = 0
+        arrow.scale.x = 0.5
+        arrow.scale.y = 0.2
+        arrow.scale.z = 0.1
+        arrow.color.a = 1.0
+        arrow.color.r = 0.0
+        arrow.color.g = 1.0
+        arrow.color.b = 0.0   
+        markers.markers.append(arrow)
+    
+    return markers

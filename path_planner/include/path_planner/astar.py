@@ -29,11 +29,11 @@ class Astar:
         self.map_resolution = self.map_info.resolution         
         
 
-    def set_pose(self,pose):
-        self.start_pose = pose
+    def set_pose(self,msg):        
+        self.start_pose = [msg.pose.pose.position.x, msg.pose.pose.position.y]
 
-    def set_goal(self,goal):
-        self.goal_pose = goal
+    def set_goal(self,msg):        
+        self.goal_pose = [msg.pose.position.x, msg.pose.position.y]
     
     def _get_movements_4n(self):    
         return [(self.map_info.resolution, 0, self.map_info.resolution),
@@ -160,4 +160,4 @@ class Astar:
             path.reverse()
             path_idx.reverse()
 
-        return path, path_idx
+        return path
