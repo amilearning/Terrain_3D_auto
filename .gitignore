@@ -4,3 +4,4 @@
 mpc_gp/data/*
 FORCESNLPsolver/*
 .__pycache__/
+*.pickle
