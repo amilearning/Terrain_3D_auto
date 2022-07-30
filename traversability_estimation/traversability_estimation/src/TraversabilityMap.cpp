@@ -170,7 +170,7 @@ bool TraversabilityMap::setElevationMap(const grid_map_msgs::GridMap& msg) {
 
   // initial callback 
   if(!elevationMapInitialized_){
-    grid_map::GridMap global_map({"elevation","terrain_traversability"}); 
+    grid_map::GridMap global_map({"elevation","terrain_traversability","surface_normal_x","surface_normal_y","surface_normal_z"}); 
     global_map.setFrameId("map");
     global_map.setGeometry(Eigen::Array2d(global_map_size_/elevationMap.getResolution(), global_map_size_/elevationMap.getResolution()), elevationMap.getResolution(), elevationMap.getPosition());
     GlobalMap_ = global_map;
@@ -326,7 +326,13 @@ for (grid_map::GridMapIterator it(terrainMapCopy); !it.isPastEnd(); ++it) {
       terrainMapCopy.getPosition(*it, position);
       if (GlobalMap_.isInside(position)){
           GlobalMap_.atPosition("elevation", position) = terrainMapCopy.at("elevation", *it);
-          GlobalMap_.atPosition("terrain_traversability", position) = terrainMapCopy.at("terrain_traversability", *it);
+          GlobalMap_.atPosition("terrain_traversability", position) = terrainMapCopy.at("terrain_traversability", *it);           
+          if (terrainMapCopy.exists("surface_normal_x") && terrainMapCopy.exists("surface_normal_y") && terrainMapCopy.exists("surface_normal_z")){
+            GlobalMap_.atPosition("surface_normal_x", position) = terrainMapCopy.at("surface_normal_x", *it); 
+            GlobalMap_.atPosition("surface_normal_y", position) = terrainMapCopy.at("surface_normal_y", *it); 
+            GlobalMap_.atPosition("surface_normal_z", position) = terrainMapCopy.at("surface_normal_z", *it); 
+          }
+          
       }      
     } 
 //////////////////////////////////////////////////////////////////////////////////////////// 

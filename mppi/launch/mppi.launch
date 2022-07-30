@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+
+
+    <!-- Node that runs the MPC -->
+    <node pkg="mppi" type="main_node.py" name="mppi_node" output="screen">        
+    </node>
+    
+    
+</launch>

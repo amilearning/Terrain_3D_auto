@@ -35,7 +35,8 @@ limitations under the License.
 
   <!-- Degree-to-radian conversions -->
   <xacro:property name="degrees_45" value="0.785398163"/>
-  <xacro:property name="degrees_21" value="0.3665191429"/>
+  <!-- <xacro:property name="degrees_21" value="0.3665191429"/> -->
+  <xacro:property name="degrees_25" value="0.4363"/>
   <xacro:property name="degrees_90" value="1.57079633"/>
 
   <!-- chassis_length is measured along the x axis, chassis_width
@@ -43,7 +44,7 @@ limitations under the License.
   <xacro:property name="chassis_length" value="0.90"/>
   <xacro:property name="chassis_width" value="0.25"/>
   <xacro:property name="chassis_height" value="0.25"/>
-  <xacro:property name="chassis_mass" value="20.5"/>
+  <xacro:property name="chassis_mass" value="20.5"/>  
   <xacro:property name="chassis_cm_height" value="0.12"/>
   <xacro:property name="chassis_cm_to_rear_shock" value="0.23"/>
   <xacro:property name="chassis_cm_to_front_shock" value="0.34"/>
@@ -87,6 +88,7 @@ limitations under the License.
   <xacro:property name="front_shock_eff_limit" value="189.1369818"/>
   <xacro:property name="rear_shock_eff_limit" value="296.441969791"/>
   <xacro:property name="shock_vel_limit" value="1000"/>
+  
 
   <!-- The specifications for a Titan(R) 550 motor could not be found, so the
        stall torque of a Mabuchi Motor(R) RS-550VC-7525 motor was used instead.
@@ -316,7 +318,7 @@ limitations under the License.
       <child link="${lr_prefix}_${fr_prefix}_axle_carrier"/>
       <!-- cant the front wheels to improve traction -->
       <axis xyz="0 ${-lr_reflect*0.09950372}  0.99503719"/>
-      <limit lower="${-degrees_21}" upper="${degrees_21}"
+      <limit lower="${-degrees_25}" upper="${degrees_25}"
              effort="${servo_stall_torque}" velocity="${servo_no_load_speed}"/>
     </joint>
 
@@ -400,6 +402,7 @@ limitations under the License.
                iyz="0"
                izz="0.1067"/>
     </inertial>
+   
   </link>
   <gazebo reference="chassis">
     <mu1>0.2</mu1>

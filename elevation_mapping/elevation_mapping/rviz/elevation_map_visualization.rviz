@@ -4,10 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Plan1
         - /Plan1/hybridastar_path1
-        - /Plan1/hybridastar_path1/Status1
         - /Mapping1
-      Splitter Ratio: 0.38195303082466125
+      Splitter Ratio: 0.45190155506134033
     Tree Height: 249
   - Class: rviz/Selection
     Name: Selection
@@ -65,10 +65,10 @@ Visualization Manager:
           Value: false
         - Class: rviz/MarkerArray
           Enabled: true
-          Marker Topic: /astar_path
+          Marker Topic: /hybrid_gp_astar__path
           Name: hybridastar_path
           Namespaces:
-            arrow: true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -354,10 +354,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5497971773147583
+      Pitch: 0.9147968888282776
       Target Frame: base_link
       Value: ThirdPersonFollower (rviz)
-      Yaw: 0.3503565788269043
+      Yaw: 3.2153515815734863
     Saved: ~
 Window Geometry:
   Displays:
@@ -378,4 +378,4 @@ Window Geometry:
     collapsed: true
   Width: 1389
   X: 258
-  Y: 245
+  Y: 215

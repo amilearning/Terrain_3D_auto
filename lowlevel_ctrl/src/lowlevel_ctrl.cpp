@@ -66,16 +66,18 @@ LowlevelCtrl::LowlevelCtrl(ros::NodeHandle& nh_ctrl, ros::NodeHandle& nh_signal)
 
   nh_signal_.param<std::string>("chassisCmd_topic", chassisCmd_topic, "/chassisCommand");
   nh_signal_.param<std::string>("imu_topic", imu_topic, "/imu/imu");  
+
  
 
   imuSub = nh_signal_.subscribe(imu_topic, 50, &LowlevelCtrl::ImuCallback, this);
   filt_imu_pub  = nh_signal_.advertise<sensor_msgs::Imu>("filtered_imu", 2);      
   chassisCmdPub  = nh_ctrl.advertise<autorally_msgs::chassisCommand>(chassisCmd_topic, 2);   
-
+  manual_ctrl_echo = nh_ctrl.advertise<hmcl_msgs::vehicleCmd>("/acc_cmd_manual",2);
   debugPub  = nh_ctrl.advertise<geometry_msgs::PoseStamped>("/lowlevel_debug", 2);   
   
   acc_x_pub  = nh_ctrl.advertise<std_msgs::Float64>("/state", 2);   
   ctleffortSub = nh_signal_.subscribe("/control_effort", 50, &LowlevelCtrl::controleffortCallback, this);   
+  joySub = nh_signal_.subscribe("/joy_orig", 50, &LowlevelCtrl::joyCallback, this);   
 
 
   accCmdSub = nh_signal_.subscribe("/acc_cmd", 2, &LowlevelCtrl::accCabllback, this);   
@@ -92,6 +94,24 @@ LowlevelCtrl::LowlevelCtrl(ros::NodeHandle& nh_ctrl, ros::NodeHandle& nh_signal)
 
 LowlevelCtrl::~LowlevelCtrl()
 {}
+void LowlevelCtrl::joyCallback(const sensor_msgs::Joy::ConstPtr& msg){
+    
+    if(msg->buttons[4] > 0 || msg->buttons[4] > 0){
+      // throttle    --> msg->axes[1]  
+      // steering    --> -1*msg->axes[3]  
+        manual_cmd.header = msg->header;
+        vehicle_cmd.header = msg->header;
+        vehicle_cmd.header.stamp = ros::Time::now();
+        vehicle_cmd.acceleration = msg->axes[1]*3;
+        vehicle_cmd.steering     = -1*msg->axes[3]*(25*PI/180.0);                              
+    }else{             
+      manual_ctrl = false;
+      vehicle_cmd.acceleration = -1;
+      vehicle_cmd.steering     = 0.0;     
+    }
+    manual_ctrl_echo.publish(vehicle_cmd); 
+}
+
 
 void LowlevelCtrl::odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   cur_odom = *msg;
@@ -254,8 +274,11 @@ void LowlevelCtrl::ControlLoop()
           // throttle_cmd = manual_throttle;
         chassis_cmd.throttle = throttle_cmd;        
         chassis_cmd.frontBrake =brake_cmd;
-        chassis_cmd.steering =steering_cmd;               
+        chassis_cmd.steering =steering_cmd;  
+        
         chassisCmdPub.publish(chassis_cmd);
+        
+        
         
         
       }

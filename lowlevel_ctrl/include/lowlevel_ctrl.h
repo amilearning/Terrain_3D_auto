@@ -29,6 +29,7 @@
 
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/NavSatFix.h>
+#include <sensor_msgs/Joy.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
 
@@ -66,8 +67,8 @@ ros::NodeHandle nh_ctrl_, nh_signal_;
 std::string chassisCmd_topic, imu_topic;
 
 std::mutex mtx_;
-ros::Subscriber imuSub, accCmdSub, steerCmdSub, ctleffortSub, odomSub;
-ros::Publisher  filt_imu_pub, chassisCmdPub, debugPub, acc_x_pub;
+ros::Subscriber imuSub, accCmdSub, steerCmdSub, ctleffortSub, odomSub, joySub;
+ros::Publisher  filt_imu_pub, chassisCmdPub, debugPub, acc_x_pub, manual_ctrl_echo;
 
 dynamic_reconfigure::Server<lowlevel_ctrl::testConfig> srv;
 dynamic_reconfigure::Server<lowlevel_ctrl::testConfig>::CallbackType f;
@@ -98,6 +99,8 @@ double roll_coef = 0.01035;
 double cmd_scale, cmd_offset, brake_scale;
 bool enforce_throttle;
 double manual_acc_cmd, manual_throttle, manual_brake;
+autorally_msgs::chassisCommand manual_cmd;
+bool manual_ctrl;
 
 
 public:
@@ -109,6 +112,7 @@ void ControlLoop();
 void ImuCallback(const sensor_msgs::Imu::ConstPtr& msg);
 void accCabllback(const hmcl_msgs::vehicleCmd::ConstPtr& msg);
 void controleffortCallback(const std_msgs::Float64::ConstPtr& msg);
+void joyCallback(const sensor_msgs::Joy::ConstPtr& msg);
 
 
 void dyn_callback(lowlevel_ctrl::testConfig& config, uint32_t level);

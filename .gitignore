@@ -3,3 +3,4 @@
 *vc.db
 mpc_gp/data/*
 FORCESNLPsolver/*
+.__pycache__/

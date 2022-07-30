@@ -19,7 +19,7 @@ class HybridGPAstar(Astar):
         self.dt = 0.5
         self.max_delta = 0.38
         self.thetas = get_discretized_thetas(np.pi/3)
-        self.traversability_weight =10.0
+        self.traversability_weight =1000.0
         
       
 
